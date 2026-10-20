@@ -154,6 +154,7 @@ public final class AudioEngine {
                     continue;
                 }
                 this.equalizer.process(buffer, frames);
+                this.spectrum.feed(buffer, frames);
                 float target = this.volume * this.volume;
                 if (this.currentGain < 0.0F) {
                     this.currentGain = target;
@@ -172,7 +173,6 @@ public final class AudioEngine {
                         bytes[index * 2 + 1] = (byte) (value >> 8);
                     }
                 }
-                this.spectrum.feed(buffer, frames);
                 if (now - lastAnalysis > 16_000_000L) {
                     this.spectrum.analyze(this.barCount);
                     lastAnalysis = now;

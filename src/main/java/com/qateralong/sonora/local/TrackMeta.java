@@ -20,13 +20,24 @@ public record TrackMeta(String title, String artist, String album, long duration
         String base = file.contains(".") ? file.substring(0, file.lastIndexOf('.')) : file;
         String title = base;
         String artist = "";
-        String album = path.getParent() == null ? "" : path.getParent().getFileName().toString();
+        String album = path.getParent() == null || path.getParent().getFileName().toString().equalsIgnoreCase("music") ? "" : path.getParent().getFileName().toString();
         byte[] artwork = null;
         long duration = 0L;
-        int dash = base.indexOf(" - ");
-        if (dash > 0) {
-            artist = base.substring(0, dash).trim();
-            title = base.substring(dash + 3).trim();
+        String clean = base.replace('_', ' ')
+                .replaceAll("[\\(\\[][^)\\]]*\\.[a-z]{2,4}[)\\]]", "")
+                .replaceAll("\\s*[-–—]\\s+", " - ")
+                .replaceAll("\\s+", " ").trim();
+        java.util.List<String> parts = new java.util.ArrayList<>(java.util.List.of(clean.split(" - ")));
+        if (parts.size() >= 4 && parts.size() % 2 == 0) {
+            int half = parts.size() / 2;
+            if (String.join(" - ", parts.subList(0, half)).equalsIgnoreCase(String.join(" - ", parts.subList(half, parts.size())))) {
+                parts = new java.util.ArrayList<>(parts.subList(0, half));
+            }
+        }
+        title = clean;
+        if (parts.size() >= 2) {
+            artist = parts.get(0).trim();
+            title = String.join(" - ", parts.subList(1, parts.size())).trim();
         }
         String lower = file.toLowerCase(Locale.ROOT);
         try {

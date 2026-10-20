@@ -4,11 +4,17 @@
   "version": "${version}",
   "name": "Sonora",
   "description": "In-game music player for Spotify and local music files: mini player, full player with lyrics, equalizer and visualizer.",
-  "authors": ["qateralong"],
+  "authors": [
+    "qateralong"
+  ],
   "license": "All Rights Reserved",
   "icon": "assets/sonora/icon.png",
   "environment": "client",
-  "entrypoints": {},
+  "entrypoints": {
+    "client": [
+      "com.qateralong.sonora.Sonora"
+    ]
+  },
   "mixins": [],
   "depends": {
     "fabricloader": ">=0.16.0",
