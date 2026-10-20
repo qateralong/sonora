@@ -226,7 +226,11 @@ public final class OAuthSession {
                     .timeout(Duration.ofSeconds(10)).header("Authorization", "Bearer " + this.accessToken()).GET().build();
             HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) {
-                Sonora.LOGGER.warn("Could not read Spotify profile: HTTP {}", response.statusCode());
+                Sonora.LOGGER.warn("Could not read Spotify profile: HTTP {} {}", response.statusCode(), response.body());
+                if (response.statusCode() == 403 && response.body() != null && response.body().toLowerCase(java.util.Locale.ROOT).contains("registered")) {
+                    this.state = State.ERROR;
+                    this.message = Sonora.text("sonora.error.not_registered");
+                }
                 return;
             }
             JsonObject me = JsonParser.parseString(response.body()).getAsJsonObject();

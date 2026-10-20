@@ -100,13 +100,13 @@ public class ClientIdScreen extends Screen {
         g.drawCenteredString(this.font, this.title, this.width / 2, this.cardY + 10, 0xFFFFFFFF);
         int y = this.cardY + 26;
         int limit = this.cardY + this.cardH - 78;
-        for (String key : new String[]{"sonora.client.why", "sonora.client.step1", "sonora.client.step2", "sonora.client.step3"}) {
+        for (String key : new String[]{"sonora.client.why", "sonora.client.step1", "sonora.client.step2", "sonora.client.step3", "sonora.client.limit"}) {
             List<FormattedCharSequence> lines = this.font.split(Component.literal(Sonora.text(key, SpotifyAuth.webRedirect())), cardW - 30);
             for (FormattedCharSequence line : lines) {
                 if (y + 9 > limit) {
                     break;
                 }
-                g.drawString(this.font, line, left + 15, y, key.equals("sonora.client.why") ? 0xFFB3B3B3 : 0xFFE0E0E0, false);
+                g.drawString(this.font, line, left + 15, y, key.equals("sonora.client.why") ? 0xFFB3B3B3 : key.equals("sonora.client.limit") ? 0xFFFFC060 : 0xFFE0E0E0, false);
                 y += 10;
             }
             y += 3;

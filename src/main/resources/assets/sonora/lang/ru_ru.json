@@ -91,7 +91,7 @@
   "sonora.client.why": "Воспроизведение работает и так, но плейлисты, лайки, поиск и управление через общий ключ Spotify постоянно упираются в лимит запросов. Свой ключ бесплатный и делается за пару минут (нужен Premium).",
   "sonora.client.step1": "1. Откройте Spotify Developer Dashboard и нажмите Create app (название любое).",
   "sonora.client.step2": "2. В Redirect URIs добавьте %s, отметьте Web API и сохраните.",
-  "sonora.client.step3": "3. Скопируйте Client ID из настроек приложения сюда и нажмите «Войти». Друзей можно добавить в User Management (до 5 аккаунтов).",
+  "sonora.client.step3": "3. Скопируйте Client ID из настроек приложения сюда и нажмите «Войти».",
   "sonora.client.field": "Client ID (32 символа)",
   "sonora.client.dashboard": "Открыть Dashboard",
   "sonora.client.copy_redirect": "Скопировать Redirect URI",
@@ -104,5 +104,7 @@
   "sonora.error.rate_limited": "Spotify ограничил запросы, повтор через %s с.",
   "sonora.list.error": "Не удалось загрузить: %s",
   "sonora.error.relogin": "сессия Spotify истекла, войдите заново.",
-  "sonora.error.token": "Spotify не выдал токен (HTTP %s)."
+  "sonora.error.token": "Spotify не выдал токен (HTTP %s).",
+  "sonora.client.limit": "Лимит Spotify: один Client ID — до 5 аккаунтов, и все они должны быть добавлены в User Management. Остальным игрокам нужен свой ключ.",
+  "sonora.error.not_registered": "этот аккаунт Spotify не добавлен в ваше приложение. Откройте Dashboard → User Management и добавьте его (до 5 аккаунтов) или используйте свой Client ID."
 }

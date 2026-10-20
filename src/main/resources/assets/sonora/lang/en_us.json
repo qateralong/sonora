@@ -91,7 +91,7 @@
   "sonora.client.why": "Playback works either way, but playlists, likes, search and controls through Spotify's shared key keep hitting the rate limit. Your own key is free and takes a couple of minutes (Premium required).",
   "sonora.client.step1": "1. Open the Spotify Developer Dashboard and click Create app (any name).",
   "sonora.client.step2": "2. Add %s to Redirect URIs, tick Web API and save.",
-  "sonora.client.step3": "3. Copy the Client ID from the app settings here and press Log in. Friends can be added in User Management (up to 5 accounts).",
+  "sonora.client.step3": "3. Copy the Client ID from the app settings here and press Log in.",
   "sonora.client.field": "Client ID (32 characters)",
   "sonora.client.dashboard": "Open Dashboard",
   "sonora.client.copy_redirect": "Copy Redirect URI",
@@ -104,5 +104,7 @@
   "sonora.error.rate_limited": "Spotify rate limited requests, retrying in %s s.",
   "sonora.list.error": "Could not load: %s",
   "sonora.error.relogin": "the Spotify session expired, please log in again.",
-  "sonora.error.token": "Spotify refused the token (HTTP %s)."
+  "sonora.error.token": "Spotify refused the token (HTTP %s).",
+  "sonora.client.limit": "Spotify limit: one Client ID allows up to 5 accounts, and each must be added in User Management. Other players need their own key.",
+  "sonora.error.not_registered": "this Spotify account is not added to your app. Open Dashboard → User Management and add it (up to 5 accounts), or use your own Client ID."
 }

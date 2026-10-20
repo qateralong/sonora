@@ -120,6 +120,9 @@ public final class SpotifyApi {
                     JsonElement error = json.getAsJsonObject().get("error");
                     message = error.isJsonObject() && error.getAsJsonObject().has("message") ? error.getAsJsonObject().get("message").getAsString() : error.toString();
                 }
+                if (status == 403 && message.toLowerCase(java.util.Locale.ROOT).contains("registered")) {
+                    message = Sonora.text("sonora.error.not_registered");
+                }
                 throw new SpotifyException(status, message);
             }
             return json.isJsonObject() ? json.getAsJsonObject() : null;
