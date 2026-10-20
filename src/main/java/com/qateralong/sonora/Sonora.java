@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.qateralong.sonora.local.LocalLibrary;
 import com.qateralong.sonora.player.MusicController;
 import com.qateralong.sonora.spotify.Librespot;
+import com.qateralong.sonora.spotify.SpotifyApi;
 import com.qateralong.sonora.spotify.SpotifyAuth;
 import com.qateralong.sonora.ui.MiniPlayer;
 import com.qateralong.sonora.ui.PlayerScreen;
@@ -73,6 +74,11 @@ public class Sonora implements ClientModInitializer {
             Librespot.stop();
             SonoraConfig.save();
         });
+    }
+
+    public static void onWebLogin() {
+        SpotifyApi.clearBlock();
+        CONTROLLER.spotify().pollSoon();
     }
 
     public static void onLogin() {

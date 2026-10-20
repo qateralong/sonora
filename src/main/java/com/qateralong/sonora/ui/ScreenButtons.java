@@ -18,8 +18,9 @@ public final class ScreenButtons {
                 Component label = SpotifyAuth.loggedIn()
                         ? Component.literal(SpotifyAuth.displayName().isEmpty() ? "Spotify" : SpotifyAuth.displayName())
                         : Component.translatable("sonora.button.login");
-                Screens.getButtons(screen).add(new PillButton(6, 6, 20, Draw.Icon.LOGO, label, Draw.GREEN,
-                        () -> client.setScreen(new LoginScreen(screen))));
+                PillButton button = new PillButton(0, 6, 20, Draw.Icon.LOGO, label, Draw.GREEN, () -> client.setScreen(new LoginScreen(screen)));
+                button.setX(width - button.getWidth() - 6);
+                Screens.getButtons(screen).add(button);
             } else if (screen instanceof PauseScreen pause && pause.showsPauseMenu()) {
                 Screens.getButtons(screen).add(new PillButton(6, 6, 20, Draw.Icon.NOTE, Component.translatable("sonora.button.music"), Draw.GREEN,
                         () -> client.setScreen(new PlayerScreen(screen))));

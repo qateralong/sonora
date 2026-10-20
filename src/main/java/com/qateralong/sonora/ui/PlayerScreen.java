@@ -52,6 +52,7 @@ public class PlayerScreen extends Screen {
     private BrowseItem container;
     private double scroll;
     private boolean loading;
+    private String listError = "";
     private EditBox searchBox;
     private String lastSearch = "";
     private int drag = -1;
@@ -148,10 +149,17 @@ public class PlayerScreen extends Screen {
 
     private void load(CompletableFuture<List<BrowseItem>> future) {
         this.loading = true;
+        this.listError = "";
+        Sonora.controller().spotify().clearError();
         future.thenAcceptAsync(result -> {
             this.items = result;
             this.loading = false;
+            this.listError = Sonora.controller().spotify().error();
         }, this.minecraft);
+    }
+
+    private static String accountName() {
+        return SpotifyAuth.displayName().isBlank() ? "Spotify" : SpotifyAuth.displayName();
     }
 
     private void openContainer(BrowseItem item) {
@@ -238,22 +246,30 @@ public class PlayerScreen extends Screen {
         Draw.icon(g, Draw.Icon.LOGO, 12, 12, 18, Colors.argb(0xFF, accent));
         Draw.scaledText(g, this.font, "Sonora", 36, 13, 1.5F, 0xFFFFFFFF, true);
         int y = 44;
+        int count = Tab.values().length;
+        int available = this.height - this.barH;
+        boolean account = 44 + count * 20 <= available - 52;
+        int step = Mth.clamp((available - 48 - (account ? 52 : 0)) / count, 16, 26);
+        int rowH = Math.min(22, step - 2);
         for (Tab entry : Tab.values()) {
             boolean selected = entry == this.tab;
-            boolean hover = Draw.inside(mouseX, mouseY, 6, y, this.sideW - 12, 22);
+            boolean hover = Draw.inside(mouseX, mouseY, 6, y, this.sideW - 12, rowH);
             if (selected || hover) {
-                Draw.rounded(g, 6, y, this.sideW - 12, 22, 5, selected ? 0x30FFFFFF : 0x18FFFFFF);
+                Draw.rounded(g, 6, y, this.sideW - 12, rowH, 5, selected ? 0x30FFFFFF : 0x18FFFFFF);
             }
-            Draw.icon(g, entry.icon, 14, y + 4, 14, selected ? Colors.argb(0xFF, accent) : 0xFFB3B3B3);
-            g.drawString(this.font, Sonora.text("sonora.tab." + entry.name().toLowerCase()), 34, y + 7, selected ? 0xFFFFFFFF : 0xFFB3B3B3, false);
+            Draw.icon(g, entry.icon, 14, y + (rowH - 14) / 2, 14, selected ? Colors.argb(0xFF, accent) : 0xFFB3B3B3);
+            g.drawString(this.font, Sonora.text("sonora.tab." + entry.name().toLowerCase()), 34, y + (rowH - 8) / 2, selected ? 0xFFFFFFFF : 0xFFB3B3B3, false);
             Tab target = entry;
-            this.hit(6, y, this.sideW - 12, 22, () -> this.switchTab(target));
-            y += 26;
+            this.hit(6, y, this.sideW - 12, rowH, () -> this.switchTab(target));
+            y += step;
+        }
+        if (!account) {
+            return;
         }
         int bottom = this.height - this.barH - 46;
         g.fill(10, bottom - 6, this.sideW - 10, bottom - 5, 0x20FFFFFF);
         if (SpotifyAuth.loggedIn()) {
-            g.drawString(this.font, Draw.ellipsize(this.font, SpotifyAuth.displayName(), this.sideW - 20), 12, bottom, 0xFFFFFFFF, false);
+            g.drawString(this.font, Draw.ellipsize(this.font, accountName(), this.sideW - 20), 12, bottom, 0xFFFFFFFF, false);
             String status = Librespot.running() ? Sonora.text("sonora.status.ready") : Librespot.status();
             Draw.scaledText(g, this.font, Draw.ellipsize(this.font, status, (int) ((this.sideW - 20) / 0.75F)), 12, bottom + 12, 0.75F, Librespot.running() ? 0xFF1ED760 : 0xFFFFA060, false);
         } else {
@@ -424,6 +440,17 @@ public class PlayerScreen extends Screen {
         if (this.loading) {
             g.drawCenteredString(this.font, Sonora.text("sonora.list.loading"), mx + mw / 2, this.listY + 20, 0xFFB3B3B3);
             return;
+        }
+        if (!this.listError.isEmpty() && (this.tab == Tab.LIBRARY || this.tab == Tab.SEARCH || this.tab == Tab.QUEUE)) {
+            String text = Sonora.text("sonora.list.error", this.listError) + (SpotifyAuth.ownClient() ? "" : " " + Sonora.text("sonora.client.hint"));
+            List<FormattedCharSequence> lines = this.font.split(Component.literal(text), Math.min(420, mw - 20));
+            int lineY = this.items.isEmpty() ? this.listY + 20 : my + mh - 6 - lines.size() * 11;
+            for (int i = 0; i < lines.size(); i++) {
+                g.drawCenteredString(this.font, lines.get(i), mx + mw / 2, lineY + i * 11, 0xFFFFA060);
+            }
+            if (this.items.isEmpty()) {
+                return;
+            }
         }
         if (this.items.isEmpty()) {
             String key = switch (this.tab) {
@@ -668,7 +695,7 @@ public class PlayerScreen extends Screen {
             config.normalize = !config.normalize;
             Librespot.restart();
         });
-        this.option(g, mx, y, mw, mouseX, mouseY, "sonora.settings.account", SpotifyAuth.loggedIn() ? SpotifyAuth.displayName() : Sonora.text("sonora.button.login"),
+        this.option(g, mx, y, mw, mouseX, mouseY, "sonora.settings.account", SpotifyAuth.loggedIn() ? accountName() : Sonora.text("sonora.button.login"),
                 () -> this.minecraft.setScreen(new LoginScreen(this)));
     }
 

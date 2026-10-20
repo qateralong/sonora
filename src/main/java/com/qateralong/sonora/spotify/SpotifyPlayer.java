@@ -51,6 +51,7 @@ public final class SpotifyPlayer {
                 if (!SpotifyAuth.loggedIn() || System.currentTimeMillis() < this.nextPoll) {
                     continue;
                 }
+                SpotifyAuth.refreshProfile();
                 this.poll();
                 long delay = this.fastPolling || this.playing ? 1000L : 5000L;
                 this.nextPoll = System.currentTimeMillis() + delay;
@@ -58,7 +59,7 @@ public final class SpotifyPlayer {
                 return;
             } catch (Exception e) {
                 this.error = e.getMessage() == null ? e.toString() : e.getMessage();
-                this.nextPoll = System.currentTimeMillis() + 5000L;
+                this.nextPoll = System.currentTimeMillis() + Math.max(5000L, SpotifyApi.blockedSeconds() * 1000L);
             }
         }
     }
@@ -102,7 +103,10 @@ public final class SpotifyPlayer {
 
     private void refreshLiked(String id) {
         try {
-            JsonArray array = getArray("/me/tracks/contains?ids=" + id);
+            JsonArray array = getArray("/me/library/contains?uris=" + SpotifyApi.enc("spotify:track:" + id));
+            if (array == null) {
+                array = getArray("/me/tracks/contains?ids=" + id);
+            }
             this.liked = array != null && !array.isEmpty() && array.get(0).getAsBoolean();
         } catch (Exception ignored) {
             this.liked = false;
@@ -110,14 +114,12 @@ public final class SpotifyPlayer {
     }
 
     private static JsonArray getArray(String path) throws Exception {
-        String token = SpotifyAuth.accessToken();
-        var request = java.net.http.HttpRequest.newBuilder(java.net.URI.create("https://api.spotify.com/v1" + path))
-                .header("Authorization", "Bearer " + token).GET().build();
-        var response = java.net.http.HttpClient.newHttpClient().send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        var response = SpotifyApi.raw(path);
         if (response.statusCode() != 200) {
             return null;
         }
-        return com.google.gson.JsonParser.parseString(response.body()).getAsJsonArray();
+        JsonElement json = com.google.gson.JsonParser.parseString(response.body());
+        return json.isJsonArray() ? json.getAsJsonArray() : null;
     }
 
     private void findOurDevice() throws Exception {
@@ -176,7 +178,11 @@ public final class SpotifyPlayer {
     }
 
     public String error() {
-        return this.error;
+        return this.error == null ? "" : this.error;
+    }
+
+    public void clearError() {
+        this.error = "";
     }
 
     private void hold() {
@@ -253,10 +259,22 @@ public final class SpotifyPlayer {
             JsonArray ids = new JsonArray();
             ids.add(current.id());
             body.add("ids", ids);
-            if (value) {
-                SpotifyApi.put("/me/tracks", body);
-            } else {
-                SpotifyApi.delete("/me/tracks", body);
+            String query = "/me/library?uris=" + SpotifyApi.enc(current.uri());
+            try {
+                if (value) {
+                    SpotifyApi.put(query, null);
+                } else {
+                    SpotifyApi.delete(query, null);
+                }
+            } catch (SpotifyApi.SpotifyException e) {
+                if (e.status == 429) {
+                    throw e;
+                }
+                if (value) {
+                    SpotifyApi.put("/me/tracks", body);
+                } else {
+                    SpotifyApi.delete("/me/tracks", body);
+                }
             }
         });
     }
@@ -374,7 +392,7 @@ public final class SpotifyPlayer {
                 String next = switch (container.kind()) {
                     case LIKED -> "/me/tracks?limit=50";
                     case ALBUM -> "/albums/" + container.id() + "/tracks?limit=50";
-                    default -> "/playlists/" + container.id() + "/tracks?limit=100";
+                    default -> "/playlists/" + container.id() + "/items?limit=100";
                 };
                 int pages = 0;
                 while (next != null && pages++ < 20) {
@@ -382,8 +400,8 @@ public final class SpotifyPlayer {
                     try {
                         page = SpotifyApi.get(next);
                     } catch (SpotifyApi.SpotifyException e) {
-                        if (pages == 1 && container.kind() == BrowseItem.Kind.PLAYLIST && (e.status == 403 || e.status == 404)) {
-                            next = "/playlists/" + container.id() + "/items?limit=100";
+                        if (pages == 1 && container.kind() == BrowseItem.Kind.PLAYLIST && e.status >= 400 && e.status != 429 && e.status != 401) {
+                            next = "/playlists/" + container.id() + "/tracks?limit=100";
                             page = SpotifyApi.get(next);
                         } else {
                             throw e;
@@ -419,7 +437,7 @@ public final class SpotifyPlayer {
         return CompletableFuture.supplyAsync(() -> {
             List<BrowseItem> items = new ArrayList<>();
             try {
-                JsonObject result = SpotifyApi.get("/search?type=track,playlist,album&limit=20&q=" + SpotifyApi.enc(query));
+                JsonObject result = SpotifyApi.get("/search?type=track,playlist,album&limit=10&q=" + SpotifyApi.enc(query));
                 if (result == null) {
                     return items;
                 }
