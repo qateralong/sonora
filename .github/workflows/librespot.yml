@@ -1,0 +1,57 @@
+name: librespot
+
+on:
+  workflow_dispatch:
+
+env:
+  LIBRESPOT_REF: v0.8.0
+  CARGO_PROFILE_RELEASE_OPT_LEVEL: s
+  CARGO_PROFILE_RELEASE_LTO: "true"
+  CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
+  CARGO_PROFILE_RELEASE_PANIC: abort
+  CARGO_PROFILE_RELEASE_STRIP: "true"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            name: linux-x64
+            exe: librespot
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+            name: linux-arm64
+            exe: librespot
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            name: windows-x64
+            exe: librespot.exe
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            name: macos-arm64
+            exe: librespot
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            name: macos-x64
+            exe: librespot
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: librespot-org/librespot
+          ref: ${{ env.LIBRESPOT_REF }}
+      - name: musl tools
+        if: contains(matrix.target, 'musl')
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: build
+        run: cargo build --release --locked --no-default-features --features rustls-tls-webpki-roots --target ${{ matrix.target }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: target/${{ matrix.target }}/release/${{ matrix.exe }}

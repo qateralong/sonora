@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "sonora",
+  "version": "${version}",
+  "name": "Sonora",
+  "description": "In-game music player for Spotify and local music files: mini player, full player with lyrics, equalizer and visualizer.",
+  "authors": ["qateralong"],
+  "license": "All Rights Reserved",
+  "icon": "assets/sonora/icon.png",
+  "environment": "client",
+  "entrypoints": {},
+  "mixins": [],
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": "~1.21.1",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
