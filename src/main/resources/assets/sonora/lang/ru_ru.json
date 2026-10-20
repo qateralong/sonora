@@ -102,5 +102,7 @@
   "sonora.client.status_off": "Не подключено.",
   "sonora.client.bad_id": "Client ID — это 32 символа из цифр и букв a–f.",
   "sonora.error.rate_limited": "Spotify ограничил запросы, повтор через %s с.",
-  "sonora.list.error": "Не удалось загрузить: %s"
+  "sonora.list.error": "Не удалось загрузить: %s",
+  "sonora.error.relogin": "сессия Spotify истекла, войдите заново.",
+  "sonora.error.token": "Spotify не выдал токен (HTTP %s)."
 }

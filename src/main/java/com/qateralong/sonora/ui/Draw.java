@@ -98,21 +98,44 @@ public final class Draw {
         }
     }
 
-    public static void marquee(GuiGraphics g, Font font, String text, int x, int y, int width, int color, boolean shadow) {
-        int textWidth = font.width(text);
+    private static final java.util.Map<String, Long> SLIDE_START = new java.util.LinkedHashMap<>(16, 0.75F, true) {
+        @Override
+        protected boolean removeEldestEntry(java.util.Map.Entry<String, Long> eldest) {
+            return this.size() > 64;
+        }
+    };
+
+    public static void slide(GuiGraphics g, Font font, String text, float x, float y, int width, float scale, int color, boolean shadow) {
+        int textWidth = Math.round(font.width(text) * scale);
         if (textWidth <= width) {
-            g.drawString(font, text, x, y, color, shadow);
+            scaledText(g, font, text, x, y, scale, color, shadow);
             return;
         }
-        int gap = 30;
-        long time = Util.getMillis();
-        int cycle = textWidth + gap;
-        double phase = (time / 30.0) % (cycle + 60);
-        int offset = (int) Math.max(0, phase - 60);
-        scissor(g, x, y - 1, x + width, y + font.lineHeight + 1);
-        g.drawString(font, text, x - offset, y, color, shadow);
-        g.drawString(font, text, x - offset + cycle, y, color, shadow);
+        long now = Util.getMillis();
+        long start = SLIDE_START.computeIfAbsent(text, key -> now);
+        int overflow = textWidth - width + 4;
+        long travel = Math.max(1200L, overflow * 28L);
+        long hold = 2200L;
+        long cycle = hold * 2 + travel * 2;
+        long t = (now - start) % cycle;
+        float offset;
+        if (t < hold) {
+            offset = 0.0F;
+        } else if (t < hold + travel) {
+            offset = ease((t - hold) / (float) travel) * overflow;
+        } else if (t < hold * 2 + travel) {
+            offset = overflow;
+        } else {
+            offset = (1.0F - ease((t - hold * 2 - travel) / (float) travel)) * overflow;
+        }
+        scissor(g, Math.round(x), Math.round(y) - 2, Math.round(x) + width, Math.round(y + font.lineHeight * scale) + 2);
+        scaledText(g, font, text, x - offset, y, scale, color, shadow);
         g.disableScissor();
+    }
+
+    public static float ease(float t) {
+        t = Math.max(0.0F, Math.min(1.0F, t));
+        return t < 0.5F ? 4.0F * t * t * t : 1.0F - (float) Math.pow(-2.0F * t + 2.0F, 3.0) / 2.0F;
     }
 
     public static void scissor(GuiGraphics g, int x0, int y0, int x1, int y1) {

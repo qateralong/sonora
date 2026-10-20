@@ -102,5 +102,7 @@
   "sonora.client.status_off": "Not connected.",
   "sonora.client.bad_id": "A Client ID is 32 characters of digits and letters a–f.",
   "sonora.error.rate_limited": "Spotify rate limited requests, retrying in %s s.",
-  "sonora.list.error": "Could not load: %s"
+  "sonora.list.error": "Could not load: %s",
+  "sonora.error.relogin": "the Spotify session expired, please log in again.",
+  "sonora.error.token": "Spotify refused the token (HTTP %s)."
 }

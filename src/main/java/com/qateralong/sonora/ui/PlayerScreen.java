@@ -53,6 +53,7 @@ public class PlayerScreen extends Screen {
     private double scroll;
     private boolean loading;
     private String listError = "";
+    private long errorSince;
     private EditBox searchBox;
     private String lastSearch = "";
     private int drag = -1;
@@ -155,7 +156,29 @@ public class PlayerScreen extends Screen {
             this.items = result;
             this.loading = false;
             this.listError = Sonora.controller().spotify().error();
+            this.errorSince = Util.getMillis();
         }, this.minecraft);
+    }
+
+    private void renderErrorBanner(GuiGraphics g, int mx, int mw, int mouseX, int mouseY) {
+        String text = Sonora.text("sonora.list.error", this.listError) + (SpotifyAuth.ownClient() ? "" : " " + Sonora.text("sonora.client.hint"));
+        int bannerX = mx + 6;
+        int bannerW = mw - 12;
+        List<FormattedCharSequence> lines = this.font.split(Component.literal(text), bannerW - 40);
+        lines = lines.subList(0, Math.min(3, lines.size()));
+        int bannerH = lines.size() * 10 + 10;
+        float appear = Draw.ease(Math.min(1.0F, (Util.getMillis() - this.errorSince) / 250.0F));
+        int y = this.listY - Math.round((1.0F - appear) * 6.0F);
+        Draw.rounded(g, bannerX, y, bannerW, bannerH, 6, Colors.argb(Math.round(0x50 * appear), 0xFF8A3D));
+        Draw.rounded(g, bannerX, y, 3, bannerH, 1, Colors.argb(Math.round(0xFF * appear), 0xFFA060));
+        for (int i = 0; i < lines.size(); i++) {
+            g.drawString(this.font, lines.get(i), bannerX + 10, y + 6 + i * 10, Colors.argb(Math.max(8, Math.round(0xFF * appear)), 0xFFD8B8), false);
+        }
+        boolean hover = Draw.inside(mouseX, mouseY, bannerX + bannerW - 22, y + 2, 18, 18);
+        Draw.icon(g, Draw.Icon.CLOSE, bannerX + bannerW - 18, y + 5, 10, hover ? 0xFFFFFFFF : 0xFFC0A090);
+        this.hit(bannerX + bannerW - 22, y + 2, 18, 18, () -> this.listError = "");
+        this.listY += bannerH + 6;
+        this.listH -= bannerH + 6;
     }
 
     private static String accountName() {
@@ -304,7 +327,7 @@ public class PlayerScreen extends Screen {
         g.pose().pushPose();
         g.pose().translate(ax, ty, 0.0F);
         g.pose().scale(1.6F, 1.6F, 1.0F);
-        Draw.marquee(g, this.font, track.title(), 0, 0, (int) (artSize / 1.6F), 0xFFFFFFFF, true);
+        Draw.slide(g, this.font, track.title(), 0, 0, (int) (artSize / 1.6F), 1.0F, 0xFFFFFFFF, true);
         g.pose().popPose();
         g.drawString(this.font, Draw.ellipsize(this.font, track.artistLine(), artSize), ax, ty + 17, Colors.argb(0xFF, Colors.mix(accent, 0xFFFFFF, 0.5F)), false);
         if (!track.album().isEmpty()) {
@@ -437,20 +460,15 @@ public class PlayerScreen extends Screen {
         this.listY = headerY + 24;
         this.listW = mw;
         this.listH = my + mh - this.listY;
-        if (this.loading) {
-            g.drawCenteredString(this.font, Sonora.text("sonora.list.loading"), mx + mw / 2, this.listY + 20, 0xFFB3B3B3);
-            return;
-        }
-        if (!this.listError.isEmpty() && (this.tab == Tab.LIBRARY || this.tab == Tab.SEARCH || this.tab == Tab.QUEUE)) {
-            String text = Sonora.text("sonora.list.error", this.listError) + (SpotifyAuth.ownClient() ? "" : " " + Sonora.text("sonora.client.hint"));
-            List<FormattedCharSequence> lines = this.font.split(Component.literal(text), Math.min(420, mw - 20));
-            int lineY = this.items.isEmpty() ? this.listY + 20 : my + mh - 6 - lines.size() * 11;
-            for (int i = 0; i < lines.size(); i++) {
-                g.drawCenteredString(this.font, lines.get(i), mx + mw / 2, lineY + i * 11, 0xFFFFA060);
-            }
+        if (!this.listError.isEmpty() && !this.loading && (this.tab == Tab.LIBRARY || this.tab == Tab.SEARCH || this.tab == Tab.QUEUE)) {
+            this.renderErrorBanner(g, mx, mw, mouseX, mouseY);
             if (this.items.isEmpty()) {
                 return;
             }
+        }
+        if (this.loading) {
+            g.drawCenteredString(this.font, Sonora.text("sonora.list.loading"), mx + mw / 2, this.listY + 20, 0xFFB3B3B3);
+            return;
         }
         if (this.items.isEmpty()) {
             String key = switch (this.tab) {
@@ -744,7 +762,7 @@ public class PlayerScreen extends Screen {
         int leftW = Math.max(120, Math.min(320, this.width / 2 - 100));
         Draw.art(g, art, 10, top + 9, 44, 5, 0xF00A0A0C);
         if (track != null) {
-            Draw.marquee(g, this.font, track.title(), 62, top + 16, leftW - 80, 0xFFFFFFFF, false);
+            Draw.slide(g, this.font, track.title(), 62, top + 16, leftW - 80, 1.0F, 0xFFFFFFFF, false);
             g.drawString(this.font, Draw.ellipsize(this.font, track.artistLine(), leftW - 80), 62, top + 30, 0xFFA0A0A0, false);
             if (now.mode() == MusicController.Mode.SPOTIFY) {
                 int hx = 62 + leftW - 76;

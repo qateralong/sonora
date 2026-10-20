@@ -280,7 +280,11 @@ public final class OAuthSession {
                 .POST(HttpRequest.BodyPublishers.ofString(body.toString())).build();
         HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) {
-            throw new IllegalStateException("token request failed: HTTP " + response.statusCode() + " " + response.body());
+            Sonora.LOGGER.warn("Spotify token request failed: HTTP {} {}", response.statusCode(), response.body());
+            if (response.body() != null && response.body().contains("invalid_grant")) {
+                throw new IllegalStateException(Sonora.text("sonora.error.relogin"));
+            }
+            throw new IllegalStateException(Sonora.text("sonora.error.token", response.statusCode()));
         }
         return JsonParser.parseString(response.body()).getAsJsonObject();
     }
