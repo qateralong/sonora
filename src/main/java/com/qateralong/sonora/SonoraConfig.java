@@ -15,6 +15,7 @@ public class SonoraConfig {
 
     public String clientId = "";
     public int oauthPort = 0;
+    public int webOauthPort = 43827;
     public String deviceName = "Minecraft";
     public String librespotPath = "";
     public int bitrate = 320;

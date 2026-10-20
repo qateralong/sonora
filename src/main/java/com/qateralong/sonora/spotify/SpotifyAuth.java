@@ -12,8 +12,17 @@ public final class SpotifyAuth {
             "user-read-currently-playing", "playlist-read-private", "playlist-read-collaborative", "user-library-read",
             "user-library-modify", "user-read-private");
 
-    public static final OAuthSession PLAYBACK = new OAuthSession("auth.json", () -> KEYMASTER_CLIENT_ID, SCOPES, Sonora::onLogin);
-    public static final OAuthSession WEB = new OAuthSession("web_auth.json", SpotifyAuth::webClientId, WEB_SCOPES, Sonora::onWebLogin);
+    public static final OAuthSession PLAYBACK = new OAuthSession("auth.json", () -> KEYMASTER_CLIENT_ID, SCOPES, () -> SonoraConfig.get().oauthPort, Sonora::onLogin);
+    public static final OAuthSession WEB = new OAuthSession("web_auth.json", SpotifyAuth::webClientId, WEB_SCOPES, SpotifyAuth::webPort, Sonora::onWebLogin);
+
+    public static int webPort() {
+        int port = SonoraConfig.get().webOauthPort;
+        return port > 0 && port < 65536 ? port : 43827;
+    }
+
+    public static String webRedirect() {
+        return "http://127.0.0.1:" + webPort() + "/login";
+    }
 
     private SpotifyAuth() {
     }

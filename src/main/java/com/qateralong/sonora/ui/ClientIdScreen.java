@@ -14,7 +14,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 
 public class ClientIdScreen extends Screen {
-    public static final String REDIRECT = "http://127.0.0.1/login";
     private static final String DASHBOARD = "https://developer.spotify.com/dashboard";
     private final Screen parent;
     private EditBox field;
@@ -46,7 +45,7 @@ public class ClientIdScreen extends Screen {
                 () -> Util.getPlatform().openUri(URI.create(DASHBOARD)));
         this.addRenderableWidget(dashboard);
         PillButton copy = new PillButton(dashboard.getX() + dashboard.getWidth() + 6, y, 20, Draw.Icon.PLUS,
-                Component.translatable("sonora.client.copy_redirect"), 0x9AA4FF, () -> this.minecraft.keyboardHandler.setClipboard(REDIRECT));
+                Component.translatable("sonora.client.copy_redirect"), 0x9AA4FF, () -> this.minecraft.keyboardHandler.setClipboard(SpotifyAuth.webRedirect()));
         this.addRenderableWidget(copy);
         int bottom = this.height - 28;
         PillButton login = new PillButton(0, bottom, 20, Draw.Icon.PLAY, Component.translatable(
@@ -102,7 +101,7 @@ public class ClientIdScreen extends Screen {
         int y = this.cardY + 26;
         int limit = this.cardY + this.cardH - 78;
         for (String key : new String[]{"sonora.client.why", "sonora.client.step1", "sonora.client.step2", "sonora.client.step3"}) {
-            List<FormattedCharSequence> lines = this.font.split(Component.literal(Sonora.text(key, REDIRECT)), cardW - 30);
+            List<FormattedCharSequence> lines = this.font.split(Component.literal(Sonora.text(key, SpotifyAuth.webRedirect())), cardW - 30);
             for (FormattedCharSequence line : lines) {
                 if (y + 9 > limit) {
                     break;

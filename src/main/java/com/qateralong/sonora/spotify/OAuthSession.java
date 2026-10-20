@@ -47,6 +47,7 @@ public final class OAuthSession {
     private final String fileName;
     private final Supplier<String> clientId;
     private final String scopes;
+    private final java.util.function.IntSupplier port;
     private final Runnable onLogin;
     private Tokens tokens;
     private volatile State state = State.LOGGED_OUT;
@@ -55,8 +56,9 @@ public final class OAuthSession {
     private volatile long nextProfileAttempt;
     private HttpServer server;
 
-    public OAuthSession(String fileName, Supplier<String> clientId, String scopes, Runnable onLogin) {
+    public OAuthSession(String fileName, Supplier<String> clientId, String scopes, java.util.function.IntSupplier port, Runnable onLogin) {
         this.fileName = fileName;
+        this.port = port;
         this.clientId = clientId;
         this.scopes = scopes;
         this.onLogin = onLogin;
@@ -144,7 +146,7 @@ public final class OAuthSession {
             String challenge = Base64.getUrlEncoder().withoutPadding().encodeToString(
                     MessageDigest.getInstance("SHA-256").digest(verifier.getBytes(StandardCharsets.US_ASCII)));
             String expectedState = randomString(16);
-            int port = Math.max(0, SonoraConfig.get().oauthPort);
+            int port = Math.max(0, this.port.getAsInt());
             this.server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), port), 0);
             String redirect = "http://127.0.0.1:" + this.server.getAddress().getPort() + "/login";
             this.server.createContext("/login", exchange -> {
