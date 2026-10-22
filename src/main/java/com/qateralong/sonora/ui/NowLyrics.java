@@ -13,7 +13,7 @@ public final class NowLyrics {
     }
 
     public static Lyrics.Result get(TrackInfo track) {
-        if (track == null || !SonoraConfig.get().lyrics) {
+        if (track == null || !SonoraConfig.get().showLyrics) {
             return null;
         }
         String current = track.title() + "|" + track.artistLine();

@@ -62,8 +62,11 @@ public final class Lyrics {
                     + (album == null || album.isBlank() ? "" : "&album_name=" + enc(album))
                     + (durationMs > 0 ? "&duration=" + Math.round(durationMs / 1000.0) : "");
             JsonObject json = request(url);
-            if (json == null) {
-                json = searchBest(title, artist);
+            if (json == null || !synced(json)) {
+                JsonObject found = searchBest(title, artist, durationMs);
+                if (found != null && (json == null || synced(found))) {
+                    json = found;
+                }
             }
             if (json == null) {
                 return Result.NONE;
@@ -87,7 +90,11 @@ public final class Lyrics {
         return Result.NONE;
     }
 
-    private static JsonObject searchBest(String title, String artist) throws Exception {
+    private static boolean synced(JsonObject entry) {
+        return entry.has("syncedLyrics") && !entry.get("syncedLyrics").isJsonNull() && !entry.get("syncedLyrics").getAsString().isBlank();
+    }
+
+    private static JsonObject searchBest(String title, String artist, long durationMs) throws Exception {
         HttpResponse<String> response = HTTP.send(HttpRequest.newBuilder(URI.create("https://lrclib.net/api/search?track_name=" + enc(title) + "&artist_name=" + enc(artist)))
                 .header("User-Agent", "Sonora Minecraft mod").timeout(Duration.ofSeconds(10)).GET().build(), HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) {
@@ -95,16 +102,24 @@ public final class Lyrics {
         }
         var array = JsonParser.parseString(response.body()).getAsJsonArray();
         JsonObject best = null;
+        JsonObject bestSynced = null;
+        double bestDelta = Double.MAX_VALUE;
         for (var element : array) {
             JsonObject entry = element.getAsJsonObject();
-            if (entry.has("syncedLyrics") && !entry.get("syncedLyrics").isJsonNull()) {
-                return entry;
-            }
             if (best == null) {
                 best = entry;
             }
+            if (!synced(entry)) {
+                continue;
+            }
+            double delta = durationMs > 0 && entry.has("duration") && !entry.get("duration").isJsonNull()
+                    ? Math.abs(entry.get("duration").getAsDouble() - durationMs / 1000.0) : 0.0;
+            if (delta < bestDelta) {
+                bestDelta = delta;
+                bestSynced = entry;
+            }
         }
-        return best;
+        return bestSynced != null && bestDelta <= 20.0 ? bestSynced : best;
     }
 
     private static JsonObject request(String url) throws Exception {

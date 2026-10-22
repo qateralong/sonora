@@ -13,7 +13,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 
-public class LoginScreen extends Screen {
+public class LoginScreen extends SonoraScreen {
     private final Screen parent;
     private OAuthSession.State lastState;
     private int cardY;
@@ -26,7 +26,7 @@ public class LoginScreen extends Screen {
     }
 
     @Override
-    protected void init() {
+    protected void layout() {
         this.lastState = SpotifyAuth.state();
         this.lastOwnClient = SpotifyAuth.ownClient();
         List<PillButton> buttons = new ArrayList<>();
@@ -109,7 +109,9 @@ public class LoginScreen extends Screen {
         int cardW = Math.min(320, this.width - 40);
         int cardH = this.cardH;
         int cardY = this.cardY;
-        Draw.roundedGradient(g, cx - cardW / 2, cardY, cardW, cardH, 10, 0xE01A2A20, 0xE00C0C0E);
+        Draw.rounded(g, cx - cardW / 2 - 10, cardY - 10, cardW + 20, cardH + 20, 20, 0x101ED760);
+        Draw.rounded(g, cx - cardW / 2 - 1, cardY - 1, cardW + 2, cardH + 2, 11, 0x24FFFFFF);
+        Draw.roundedGradient(g, cx - cardW / 2, cardY, cardW, cardH, 10, 0xF01A2A20, 0xF00C0C0E);
         Draw.icon(g, Draw.Icon.LOGO, cx - 16, cardY + 12, 32, 0xFF1ED760);
         Draw.scaledText(g, this.font, "Sonora", cx - this.font.width("Sonora"), cardY + 50, 2.0F, 0xFFFFFFFF, true);
         String status;

@@ -170,6 +170,32 @@ public final class Draw {
         g.pose().popPose();
     }
 
+    public static void toggle(GuiGraphics g, int x, int y, boolean on, int accent) {
+        rounded(g, x, y, 22, 12, 6, on ? Colors.argb(0xFF, accent) : 0x40FFFFFF);
+        rounded(g, on ? x + 12 : x + 2, y + 2, 8, 8, 4, on ? 0xFF000000 : 0xFFE0E0E0);
+    }
+
+    public static void tooltip(GuiGraphics g, Font font, String text, int x, int y, int screenW) {
+        int w = font.width(text) + 12;
+        int h = 16;
+        int tx = Math.max(4, Math.min(screenW - w - 4, x - w / 2));
+        int ty = y - h - 4;
+        g.pose().pushPose();
+        g.pose().translate(0.0F, 0.0F, 300.0F);
+        rounded(g, tx, ty, w, h, 5, 0xF41E1E22);
+        g.drawString(font, text, tx + 6, ty + 4, 0xFFFFFFFF, false);
+        g.pose().popPose();
+    }
+
+    public static void bars(GuiGraphics g, int x, int y, int h, boolean playing, int color) {
+        long now = Util.getMillis();
+        for (int i = 0; i < 3; i++) {
+            float wave = playing ? 0.5F + 0.5F * (float) Math.sin(now / (140.0 + i * 37.0) + i * 1.7) : 0.3F;
+            int bh = Math.max(2, Math.round(h * (0.3F + 0.7F * wave)));
+            g.fill(x + i * 3, y + h - bh, x + i * 3 + 2, y + h, color);
+        }
+    }
+
     public static boolean inside(double mx, double my, int x, int y, int w, int h) {
         return mx >= x && mx < x + w && my >= y && my < y + h;
     }

@@ -27,13 +27,13 @@ public class SonoraConfig {
     public String eqPreset = "flat";
     public boolean miniPlayer = true;
     public String miniCorner = "top_right";
-    public float miniScale = 1.0F;
+    public float miniScale = 0.75F;
     public boolean miniVisualizer = true;
-    public boolean miniLyrics = true;
     public String visualizerStyle = "bars";
     public int visualizerBars = 48;
     public boolean accentFromArtwork = true;
-    public boolean lyrics = true;
+    public boolean showLyrics = true;
+    public int uiScale = 0;
     public List<String> musicFolders = new ArrayList<>();
     public String lastSource = "spotify";
 

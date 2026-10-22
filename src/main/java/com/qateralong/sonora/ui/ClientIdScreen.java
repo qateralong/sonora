@@ -13,7 +13,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 
-public class ClientIdScreen extends Screen {
+public class ClientIdScreen extends SonoraScreen {
     private static final String DASHBOARD = "https://developer.spotify.com/dashboard";
     private final Screen parent;
     private EditBox field;
@@ -27,10 +27,10 @@ public class ClientIdScreen extends Screen {
     }
 
     @Override
-    protected void init() {
+    protected void layout() {
         this.lastState = SpotifyAuth.WEB.state();
         int cardW = Math.min(380, this.width - 30);
-        this.cardH = Math.min(this.height - 50, 210);
+        this.cardH = Math.min(this.height - 50, 250);
         this.cardY = Math.max(8, (this.height - 30 - this.cardH) / 2);
         int left = this.width / 2 - cardW / 2;
         int rowY = this.cardY + this.cardH - 60;
@@ -47,7 +47,7 @@ public class ClientIdScreen extends Screen {
         PillButton copy = new PillButton(dashboard.getX() + dashboard.getWidth() + 6, y, 20, Draw.Icon.PLUS,
                 Component.translatable("sonora.client.copy_redirect"), 0x9AA4FF, () -> this.minecraft.keyboardHandler.setClipboard(SpotifyAuth.webRedirect()));
         this.addRenderableWidget(copy);
-        int bottom = this.height - 28;
+        int bottom = this.cardY + this.cardH + 8;
         PillButton login = new PillButton(0, bottom, 20, Draw.Icon.PLAY, Component.translatable(
                 SpotifyAuth.WEB.state() == OAuthSession.State.WAITING_FOR_BROWSER ? "sonora.client.waiting" : "sonora.client.login"), Draw.GREEN, this::login);
         PillButton off = new PillButton(0, bottom, 20, Draw.Icon.CLOSE, Component.translatable("sonora.client.disable"), 0xFF6B6B, () -> {
@@ -96,7 +96,8 @@ public class ClientIdScreen extends Screen {
         super.renderBackground(g, mouseX, mouseY, partialTick);
         int cardW = Math.min(380, this.width - 30);
         int left = this.width / 2 - cardW / 2;
-        Draw.roundedGradient(g, left, this.cardY, cardW, this.cardH, 10, 0xE01A2A20, 0xE00C0C0E);
+        Draw.rounded(g, left - 1, this.cardY - 1, cardW + 2, this.cardH + 2, 11, 0x24FFFFFF);
+        Draw.roundedGradient(g, left, this.cardY, cardW, this.cardH, 10, 0xF01A2A20, 0xF00C0C0E);
         g.drawCenteredString(this.font, this.title, this.width / 2, this.cardY + 10, 0xFFFFFFFF);
         int y = this.cardY + 26;
         int limit = this.cardY + this.cardH - 78;

@@ -2,7 +2,6 @@ package com.qateralong.sonora.ui;
 
 import com.qateralong.sonora.Sonora;
 import com.qateralong.sonora.SonoraConfig;
-import com.qateralong.sonora.lyrics.Lyrics;
 import com.qateralong.sonora.player.MusicController;
 import com.qateralong.sonora.player.TrackInfo;
 import net.minecraft.Util;
@@ -14,23 +13,18 @@ import net.minecraft.world.effect.MobEffectInstance;
 
 public final class MiniPlayer {
     private static final int WIDTH = 188;
-    private static final int BASE_HEIGHT = 54;
-    private static final int LYRIC_HEIGHT = 15;
+    private static final int HEIGHT = 54;
     private static final long CHANGE_MS = 380L;
 
     private static int accent = Draw.GREEN;
     private static int dark = 0x0E1A12;
     private static float shown;
-    private static float lyricShown;
     private static long lastFrame;
     private static MusicController.NowPlaying lastNow;
     private static String currentId = "";
     private static String prevTitle = "";
     private static String prevArtist = "";
     private static long trackChanged;
-    private static String currentLyric = "";
-    private static String prevLyric = "";
-    private static long lyricChanged;
     private static float[] pulse = new float[3];
 
     private MiniPlayer() {
@@ -92,15 +86,8 @@ public final class MiniPlayer {
         Artwork.Entry art = artwork(track);
         updateAccent(art);
         Font font = minecraft.font;
-        String lyricLine = lyricLine(config, current);
-        if (!lyricLine.equals(currentLyric)) {
-            prevLyric = currentLyric;
-            currentLyric = lyricLine;
-            lyricChanged = now;
-        }
-        lyricShown = approach(lyricShown, lyricLine.isEmpty() ? 0.0F : 1.0F, 5.0F, dt);
         float scale = Math.max(0.5F, Math.min(2.0F, config.miniScale));
-        int height = BASE_HEIGHT + Math.round(LYRIC_HEIGHT * Draw.ease(lyricShown));
+        int height = HEIGHT;
         int scaledW = Math.round(WIDTH * scale);
         int scaledH = Math.round(height * scale);
         int screenW = g.guiWidth();
@@ -166,7 +153,7 @@ public final class MiniPlayer {
         String total = Draw.time(track.durationMs());
         float elapsedW = font.width(elapsed) * 0.75F;
         float totalW = font.width(total) * 0.75F;
-        int timeY = BASE_HEIGHT - 9;
+        int timeY = HEIGHT - 9;
         Draw.scaledText(g, font, elapsed, textX, timeY, 0.75F, Draw.DIM, false);
         Draw.scaledText(g, font, total, WIDTH - 8 - totalW, timeY, 0.75F, Draw.DIM, false);
         int barX = Math.round(textX + elapsedW + 5);
@@ -177,34 +164,7 @@ public final class MiniPlayer {
         int filled = Math.max(3, Math.round(barW * progress));
         Draw.rounded(g, barX, barY, filled, 3, 1, Colors.argb(0xFF, accent));
         Draw.rounded(g, barX + filled - 3, barY - 1, 5, 5, 2, Colors.argb(current.playing() ? 0xFF : 0xA0, Colors.mix(accent, 0xFFFFFF, 0.4F)));
-        if (lyricShown > 0.01F) {
-            int lyricTop = BASE_HEIGHT;
-            Draw.scissor(g, 6, lyricTop, WIDTH - 6, height - 2);
-            g.fill(8, lyricTop - 1, WIDTH - 8, lyricTop, 0x14FFFFFF);
-            float lyricChange = Math.min(1.0F, (now - lyricChanged) / 320.0F);
-            float le = Draw.ease(lyricChange);
-            int lyricColor = Colors.mix(accent, 0xFFFFFF, 0.6F);
-            if (lyricChange < 1.0F && !prevLyric.isEmpty() && Math.round(0xFF * (1.0F - le)) >= 8) {
-                Draw.slide(g, font, prevLyric, 8, lyricTop + 3 - le * 12.0F, WIDTH - 16, 0.85F, Colors.argb(Math.round(0xFF * (1.0F - le)), lyricColor), false);
-            }
-            if (!currentLyric.isEmpty()) {
-                Draw.slide(g, font, currentLyric, 8, lyricTop + 3 + (1.0F - le) * 12.0F, WIDTH - 16, 0.85F, Colors.argb(Math.max(8, Math.round(0xFF * le)), lyricColor), false);
-            }
-            g.disableScissor();
-        }
         g.pose().popPose();
-    }
-
-    private static String lyricLine(SonoraConfig config, MusicController.NowPlaying current) {
-        if (!config.miniLyrics) {
-            return "";
-        }
-        Lyrics.Result lyrics = NowLyrics.get(current.track());
-        if (lyrics == null || !lyrics.synced()) {
-            return "";
-        }
-        int index = lyrics.indexAt(current.position() + 250L);
-        return index >= 0 ? lyrics.lines().get(index).text() : "";
     }
 
     private static void drawIndicator(GuiGraphics g, int x, int y, boolean playing) {
