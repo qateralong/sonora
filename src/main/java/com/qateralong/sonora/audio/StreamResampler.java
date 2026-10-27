@@ -1,10 +1,11 @@
 package com.qateralong.sonora.audio;
 
 public final class StreamResampler {
+    private static final int HISTORY = 3;
+
     private final double step;
     private double position;
-    private float lastLeft;
-    private float lastRight;
+    private float[] history = new float[HISTORY * 2];
     private boolean primed;
 
     public StreamResampler(int from, int to) {
@@ -24,28 +25,35 @@ public final class StreamResampler {
             return stereo;
         }
         if (!this.primed) {
-            this.lastLeft = stereo[0];
-            this.lastRight = stereo[1];
+            for (int i = 0; i < HISTORY; i++) {
+                this.history[i * 2] = stereo[0];
+                this.history[i * 2 + 1] = stereo[1];
+            }
             this.primed = true;
         }
+        float[] work = new float[(HISTORY + frames) * 2];
+        System.arraycopy(this.history, 0, work, 0, HISTORY * 2);
+        System.arraycopy(stereo, 0, work, HISTORY * 2, stereo.length);
         int capacity = (int) Math.ceil((frames + 1) / this.step) + 2;
         float[] out = new float[capacity * 2];
         int count = 0;
-        while (this.position < frames) {
-            int index = (int) Math.floor(this.position);
-            double frac = this.position - index;
-            float l0 = index - 1 < 0 ? this.lastLeft : stereo[(index - 1) * 2];
-            float r0 = index - 1 < 0 ? this.lastRight : stereo[(index - 1) * 2 + 1];
-            float l1 = stereo[index * 2];
-            float r1 = stereo[index * 2 + 1];
-            out[count * 2] = (float) (l0 + (l1 - l0) * frac);
-            out[count * 2 + 1] = (float) (r0 + (r1 - r0) * frac);
+        while (this.position < frames - 2) {
+            int base = (int) Math.floor(this.position);
+            float t = (float) (this.position - base);
+            int index = base + HISTORY;
+            for (int c = 0; c < 2; c++) {
+                float p0 = work[(index - 1) * 2 + c];
+                float p1 = work[index * 2 + c];
+                float p2 = work[(index + 1) * 2 + c];
+                float p3 = work[(index + 2) * 2 + c];
+                out[count * 2 + c] = 0.5F * ((2.0F * p1) + (-p0 + p2) * t + (2.0F * p0 - 5.0F * p1 + 4.0F * p2 - p3) * t * t
+                        + (-p0 + 3.0F * p1 - 3.0F * p2 + p3) * t * t * t);
+            }
             count++;
             this.position += this.step;
         }
         this.position -= frames;
-        this.lastLeft = stereo[(frames - 1) * 2];
-        this.lastRight = stereo[(frames - 1) * 2 + 1];
+        System.arraycopy(work, (work.length / 2 - HISTORY) * 2, this.history, 0, HISTORY * 2);
         return java.util.Arrays.copyOf(out, count * 2);
     }
 }

@@ -5,6 +5,7 @@ import java.io.InputStream;
 
 public class PcmStreamSource extends QueuedSource {
     private final InputStream input;
+    private volatile boolean discarding;
 
     public PcmStreamSource(InputStream input) {
         super(32);
@@ -27,6 +28,9 @@ public class PcmStreamSource extends QueuedSource {
                 for (int i = 0; i < chunk.length; i++) {
                     chunk[i] = (short) ((buffer[i * 2 + 1] << 8) | (buffer[i * 2] & 0xFF)) / 32768.0F;
                 }
+                if (this.discarding) {
+                    continue;
+                }
                 if (!this.put(chunk)) {
                     break;
                 }
@@ -34,6 +38,10 @@ public class PcmStreamSource extends QueuedSource {
         } catch (IOException ignored) {
         }
         this.finished = true;
+    }
+
+    public void setDiscard(boolean discarding) {
+        this.discarding = discarding;
     }
 
     @Override

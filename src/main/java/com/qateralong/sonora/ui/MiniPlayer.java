@@ -125,7 +125,11 @@ public final class MiniPlayer {
             float[] bars = Visualizer.resample(Sonora.controller().engine().spectrum().bars(), 28);
             Visualizer.draw(g, bars, textX, 30, textW, 11, accent, config.visualizerStyle, 0x70);
         }
-        Draw.art(g, art, 6, 6, 40, 6, Colors.argb(0xEC, Colors.mix(dark, 0x141416, 0.35F)));
+        boolean incognito = config.incognito;
+        Draw.art(g, incognito ? null : art, 6, 6, 40, 6, Colors.argb(0xEC, Colors.mix(dark, 0x141416, 0.35F)));
+        if (current.loading()) {
+            Draw.loadingOverlay(g, 6, 6, 40, 6, 0xFFFFFF);
+        }
         Draw.rounded(g, 8, 34, 14, 10, 3, 0xC0000000);
         drawIndicator(g, 10, 35, current.playing());
         float change = trackChanged == 0L ? 1.0F : Math.min(1.0F, (now - trackChanged) / (float) CHANGE_MS);
@@ -137,8 +141,10 @@ public final class MiniPlayer {
             Draw.slide(g, font, prevArtist, textX, 20 + out, textW, 0.9F, Draw.SUBTLE, false);
         }
         float in = (1.0F - eased) * 14.0F;
-        Draw.slide(g, font, track.title(), textX, 8 + in, textW, 1.0F, Draw.TEXT, true);
-        Draw.slide(g, font, track.artistLine(), textX, 20 + in, textW, 0.9F, Draw.SUBTLE, false);
+        String shownTitle = incognito ? Sonora.text("sonora.incognito.title") : track.title();
+        String shownArtist = current.loading() ? Sonora.text("sonora.loading") : incognito ? "" : track.artistLine();
+        Draw.slide(g, font, shownTitle, textX, 8 + in, textW, 1.0F, Draw.TEXT, true);
+        Draw.slide(g, font, shownArtist, textX, 20 + in, textW, 0.9F, current.loading() ? accent | 0xFF000000 : Draw.SUBTLE, false);
         g.disableScissor();
         if (change >= 1.0F) {
             prevTitle = track.title();

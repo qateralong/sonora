@@ -144,5 +144,17 @@
   "sonora.settings.show_lyrics": "Show lyrics",
   "sonora.settings.client": "Own Client ID",
   "sonora.settings.client_on": "connected",
-  "sonora.settings.client_off": "not connected"
+  "sonora.settings.client_off": "not connected",
+  "sonora.section.audio": "Audio",
+  "sonora.settings.device": "Output device",
+  "sonora.device.default": "System default",
+  "sonora.settings.sleep": "Sleep timer",
+  "sonora.sleep.off": "Off",
+  "sonora.sleep.left": "%s min left",
+  "sonora.settings.incognito": "Incognito (hide track, no lyrics lookups)",
+  "sonora.incognito.title": "Incognito",
+  "sonora.loading": "Loading…",
+  "sonora.vpn.hint": "Spotify looks unavailable from your country or network. Turn on a VPN and try again.",
+  "sonora.vpn.retry": "Retry",
+  "sonora.vpn.toast": "Spotify is unreachable — try turning on a VPN"
 }

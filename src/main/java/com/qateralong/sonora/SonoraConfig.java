@@ -36,6 +36,8 @@ public class SonoraConfig {
     public int uiScale = 0;
     public List<String> musicFolders = new ArrayList<>();
     public String lastSource = "spotify";
+    public String outputDevice = "";
+    public boolean incognito = false;
 
     public static SonoraConfig get() {
         return instance;

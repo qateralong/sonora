@@ -130,7 +130,8 @@ public class LoginScreen extends SonoraScreen {
             }
             case WAITING_FOR_BROWSER -> status = Sonora.text("sonora.login.waiting");
             case ERROR -> {
-                status = Sonora.text("sonora.login.error", SpotifyAuth.message());
+                status = Sonora.text("sonora.login.error", SpotifyAuth.message())
+                    + (com.qateralong.sonora.spotify.Connectivity.blocked(SpotifyAuth.message()) ? " " + Sonora.text("sonora.vpn.hint") : "");
                 color = 0xFF7070;
             }
             default -> status = Sonora.text("sonora.login.intro");

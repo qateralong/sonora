@@ -2,12 +2,18 @@ package com.qateralong.sonora.audio;
 
 import com.qateralong.sonora.Sonora;
 import javax.sound.sampled.AudioFormat;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.DataLine;
+import javax.sound.sampled.Mixer;
 import javax.sound.sampled.SourceDataLine;
 
 public final class AudioEngine {
     public static final int RATE = 44100;
     private static final int FRAMES = 1024;
+    private static final float KNEE = 0.85F;
 
     private final Equalizer equalizer = new Equalizer(RATE);
     private final Spectrum spectrum = new Spectrum(RATE);
@@ -21,6 +27,11 @@ public final class AudioEngine {
     private Thread thread;
     private SourceDataLine line;
     private volatile String error;
+    private volatile String device = "";
+    private volatile float fade = 1.0F;
+    private volatile boolean reopen;
+    private final Random dither = new Random();
+    private volatile boolean flushLine;
 
     public Equalizer equalizer() {
         return this.equalizer;
@@ -44,6 +55,41 @@ public final class AudioEngine {
 
     public void setBarCount(int count) {
         this.barCount = Math.max(8, Math.min(160, count));
+    }
+
+    public void setFade(float fade) {
+        this.fade = Math.max(0.0F, Math.min(1.0F, fade));
+    }
+
+    public static List<String> devices() {
+        List<String> names = new ArrayList<>();
+        AudioFormat format = new AudioFormat(RATE, 16, 2, true, false);
+        DataLine.Info info = new DataLine.Info(SourceDataLine.class, format);
+        for (Mixer.Info mixerInfo : AudioSystem.getMixerInfo()) {
+            try {
+                if (AudioSystem.getMixer(mixerInfo).isLineSupported(info) && !names.contains(mixerInfo.getName())) {
+                    names.add(mixerInfo.getName());
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return names;
+    }
+
+    public void setDevice(String name) {
+        String next = name == null ? "" : name;
+        if (!next.equals(this.device)) {
+            this.device = next;
+            this.reopen = true;
+        }
+    }
+
+    public String device() {
+        return this.device;
+    }
+
+    public void flushOutput() {
+        this.flushLine = true;
     }
 
     public void setPaused(boolean paused) {
@@ -103,8 +149,23 @@ public final class AudioEngine {
 
     private void openLine() throws Exception {
         AudioFormat format = new AudioFormat(RATE, 16, 2, true, false);
-        SourceDataLine opened = AudioSystem.getSourceDataLine(format);
-        opened.open(format, RATE / 10 * 4);
+        SourceDataLine opened = null;
+        if (!this.device.isEmpty()) {
+            for (Mixer.Info mixerInfo : AudioSystem.getMixerInfo()) {
+                if (mixerInfo.getName().equals(this.device)) {
+                    try {
+                        opened = (SourceDataLine) AudioSystem.getMixer(mixerInfo).getLine(new DataLine.Info(SourceDataLine.class, format));
+                    } catch (Exception e) {
+                        Sonora.LOGGER.warn("Output device '{}' unavailable, using default", this.device);
+                    }
+                    break;
+                }
+            }
+        }
+        if (opened == null) {
+            opened = AudioSystem.getSourceDataLine(format);
+        }
+        opened.open(format, RATE / 4 * 4);
         opened.start();
         this.line = opened;
     }
@@ -115,9 +176,21 @@ public final class AudioEngine {
         long lastAnalysis = 0L;
         while (true) {
             try {
+                if (this.reopen && this.line != null) {
+                    this.line.stop();
+                    this.line.flush();
+                    this.line.close();
+                    this.line = null;
+                    this.equalizer.reset();
+                }
+                this.reopen = false;
                 if (this.line == null) {
                     this.openLine();
                     this.error = null;
+                }
+                if (this.flushLine) {
+                    this.flushLine = false;
+                    this.line.flush();
                 }
                 AudioSource current = this.source;
                 long now = System.nanoTime();
@@ -155,7 +228,7 @@ public final class AudioEngine {
                 }
                 this.equalizer.process(buffer, frames);
                 this.spectrum.feed(buffer, frames);
-                float target = this.volume * this.volume;
+                float target = this.volume * this.volume * this.fade * this.fade;
                 if (this.currentGain < 0.0F) {
                     this.currentGain = target;
                 }
@@ -163,12 +236,11 @@ public final class AudioEngine {
                     this.currentGain += (target - this.currentGain) * 0.002F;
                     for (int c = 0; c < 2; c++) {
                         int index = i * 2 + c;
-                        float sample = buffer[index] * this.currentGain;
-                        if (sample > 1.0F || sample < -1.0F) {
-                            sample = (float) Math.tanh(sample);
-                        }
+                        float sample = soften(buffer[index] * this.currentGain);
                         buffer[index] = sample;
-                        int value = Math.round(sample * 32767.0F);
+                        float noise = (this.dither.nextFloat() - this.dither.nextFloat()) / 32768.0F;
+                        int value = Math.round((sample + noise) * 32767.0F);
+                        value = Math.max(-32768, Math.min(32767, value));
                         bytes[index * 2] = (byte) value;
                         bytes[index * 2 + 1] = (byte) (value >> 8);
                     }
@@ -194,5 +266,14 @@ public final class AudioEngine {
                 }
             }
         }
+    }
+
+    private static float soften(float x) {
+        float magnitude = Math.abs(x);
+        if (magnitude <= KNEE) {
+            return x;
+        }
+        float shaped = KNEE + (1.0F - KNEE) * (float) Math.tanh((magnitude - KNEE) / (1.0F - KNEE));
+        return x < 0.0F ? -shaped : shaped;
     }
 }

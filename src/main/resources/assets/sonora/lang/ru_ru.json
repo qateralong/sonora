@@ -144,5 +144,17 @@
   "sonora.settings.show_lyrics": "Показывать тексты песен",
   "sonora.settings.client": "Свой Client ID",
   "sonora.settings.client_on": "подключён",
-  "sonora.settings.client_off": "не подключён"
+  "sonora.settings.client_off": "не подключён",
+  "sonora.section.audio": "Звук",
+  "sonora.settings.device": "Устройство вывода",
+  "sonora.device.default": "Системное по умолчанию",
+  "sonora.settings.sleep": "Таймер сна",
+  "sonora.sleep.off": "Выкл",
+  "sonora.sleep.left": "осталось %s мин",
+  "sonora.settings.incognito": "Инкогнито (скрыть трек, без запросов текстов)",
+  "sonora.incognito.title": "Инкогнито",
+  "sonora.loading": "Загрузка…",
+  "sonora.vpn.hint": "Похоже, Spotify недоступен в вашей стране или сети. Включите VPN и повторите.",
+  "sonora.vpn.retry": "Повторить",
+  "sonora.vpn.toast": "Spotify недоступен — попробуйте включить VPN"
 }

@@ -199,4 +199,22 @@ public final class Draw {
     public static boolean inside(double mx, double my, int x, int y, int w, int h) {
         return mx >= x && mx < x + w && my >= y && my < y + h;
     }
+
+    public static void spinner(GuiGraphics g, int cx, int cy, int radius, int rgb) {
+        int head = (int) ((net.minecraft.Util.getMillis() / 80L) % 8L);
+        int dot = Math.max(2, radius / 3);
+        for (int i = 0; i < 8; i++) {
+            double angle = i * Math.PI / 4.0 - Math.PI / 2.0;
+            int x = cx + (int) Math.round(Math.cos(angle) * radius) - dot / 2;
+            int y = cy + (int) Math.round(Math.sin(angle) * radius) - dot / 2;
+            int behind = Math.floorMod(head - i, 8);
+            int alpha = Math.max(0x38, 0xFF - behind * 0x2A);
+            g.fill(x, y, x + dot, y + dot, (alpha << 24) | (rgb & 0xFFFFFF));
+        }
+    }
+
+    public static void loadingOverlay(GuiGraphics g, int x, int y, int size, int corner, int rgb) {
+        rounded(g, x, y, size, size, corner, 0xA0000000);
+        spinner(g, x + size / 2, y + size / 2, Math.max(4, size / 5), rgb);
+    }
 }

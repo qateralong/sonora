@@ -18,7 +18,7 @@ public final class MusicController {
     public enum Mode { SPOTIFY, LOCAL }
 
     public record NowPlaying(TrackInfo track, boolean playing, long position, boolean shuffle, String repeat, Mode mode,
-                             boolean liked, boolean inGame, String device) {
+                             boolean liked, boolean inGame, String device, boolean loading) {
     }
 
     private final AudioEngine engine = new AudioEngine();
@@ -32,13 +32,20 @@ public final class MusicController {
     private FileSource localSource;
     private TrackInfo localTrack;
     private final Random random = new Random();
+    private volatile boolean loading;
+    private volatile long loadingSince;
+    private volatile String loadingFrom = "";
+    private volatile long sleepAt;
+    private volatile long sleepFadeStart;
 
     public void init() {
         SonoraConfig config = SonoraConfig.get();
         this.engine.setVolume(config.volume);
         this.engine.setBarCount(config.visualizerBars);
         this.applyEqualizer();
+        this.engine.setDevice(config.outputDevice);
         this.mode = "local".equals(config.lastSource) ? Mode.LOCAL : Mode.SPOTIFY;
+        Librespot.onLoaded(this::endLoading);
         this.spotify.start();
     }
 
@@ -99,10 +106,10 @@ public final class MusicController {
             FileSource source = this.localSource;
             boolean playing = source != null && !this.engine.paused() && this.engine.source() == source;
             long position = source == null ? 0L : source.positionMillis();
-            return new NowPlaying(this.localTrack, playing, position, this.localShuffle, this.localRepeat, Mode.LOCAL, false, true, "");
+            return new NowPlaying(this.localTrack, playing, position, this.localShuffle, this.localRepeat, Mode.LOCAL, false, true, "", false);
         }
         return new NowPlaying(this.spotify.track(), this.spotify.playing(), this.spotify.position(), this.spotify.shuffle(),
-                this.spotify.repeat(), Mode.SPOTIFY, this.spotify.liked(), this.spotify.inGame(), this.spotify.deviceName());
+                this.spotify.repeat(), Mode.SPOTIFY, this.spotify.liked(), this.spotify.inGame(), this.spotify.deviceName(), this.loading);
     }
 
     public void togglePlay() {
@@ -130,10 +137,50 @@ public final class MusicController {
         this.spotify.setPlaying(!this.spotify.playing());
     }
 
+    public boolean loading() {
+        return this.loading;
+    }
+
+    private void beginLoading() {
+        PcmStreamSource stream = Librespot.source();
+        TrackInfo track = this.spotify.track();
+        this.loadingFrom = track == null ? "" : track.id();
+        this.loadingSince = System.currentTimeMillis();
+        this.loading = true;
+        if (stream != null) {
+            stream.setDiscard(true);
+            stream.flush();
+        }
+        this.engine.flushOutput();
+    }
+
+    private void endLoading() {
+        if (!this.loading) {
+            return;
+        }
+        PcmStreamSource stream = Librespot.source();
+        if (stream != null) {
+            stream.flush();
+            stream.setDiscard(false);
+        }
+        this.engine.flushOutput();
+        this.loading = false;
+    }
+
+    public void setSleepTimer(int minutes) {
+        this.sleepAt = minutes <= 0 ? 0L : System.currentTimeMillis() + minutes * 60_000L;
+        this.sleepFadeStart = 0L;
+    }
+
+    public long sleepRemainingMillis() {
+        return this.sleepAt == 0L ? 0L : Math.max(0L, this.sleepAt - System.currentTimeMillis());
+    }
+
     public void next() {
         if (this.mode == Mode.LOCAL) {
             this.advance(1, true);
         } else {
+            this.beginLoading();
             this.spotify.next();
         }
     }
@@ -146,6 +193,7 @@ public final class MusicController {
                 this.advance(-1, true);
             }
         } else {
+            this.beginLoading();
             this.spotify.previous();
         }
     }
@@ -217,6 +265,7 @@ public final class MusicController {
             stream.flush();
             this.engine.play(stream, null);
         }
+        this.beginLoading();
         if (item.kind() == BrowseItem.Kind.PLAYLIST || item.kind() == BrowseItem.Kind.ALBUM) {
             this.spotify.playContext(item.uri(), null, 0);
             return;
@@ -330,7 +379,39 @@ public final class MusicController {
         this.playLocalAt(next);
     }
 
+    private void tickLoading() {
+        if (!this.loading) {
+            return;
+        }
+        TrackInfo track = this.spotify.track();
+        long elapsed = System.currentTimeMillis() - this.loadingSince;
+        boolean changed = track != null && !track.id().equals(this.loadingFrom);
+        if (elapsed > 6000L || (changed && elapsed > 1500L) || !Librespot.running()) {
+            this.endLoading();
+        }
+    }
+
+    private void tickSleep() {
+        if (this.sleepAt == 0L) {
+            return;
+        }
+        long left = this.sleepAt - System.currentTimeMillis();
+        if (left <= 0L) {
+            this.sleepAt = 0L;
+            this.engine.setFade(1.0F);
+            if (this.mode == Mode.LOCAL) {
+                this.engine.setPaused(true);
+            } else if (this.spotify.playing()) {
+                this.spotify.setPlaying(false);
+            }
+        } else {
+            this.engine.setFade(left < 10_000L ? left / 10_000.0F : 1.0F);
+        }
+    }
+
     public void tick() {
+        this.tickLoading();
+        this.tickSleep();
         if (this.mode == Mode.SPOTIFY && SpotifyAuth.loggedIn()) {
             PcmStreamSource stream = Librespot.source();
             if (stream != null && this.engine.source() != stream) {

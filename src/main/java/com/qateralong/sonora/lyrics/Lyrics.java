@@ -49,6 +49,9 @@ public final class Lyrics {
     }
 
     public static CompletableFuture<Result> get(String title, String artist, String album, long durationMs) {
+        if (com.qateralong.sonora.SonoraConfig.get().incognito) {
+            return CompletableFuture.completedFuture(Result.NONE);
+        }
         if (title == null || title.isBlank()) {
             return CompletableFuture.completedFuture(Result.NONE);
         }

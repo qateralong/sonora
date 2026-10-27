@@ -19,12 +19,25 @@ public final class Librespot {
     private static Thread watchdog;
     private static volatile boolean wanted;
     private static volatile int failures;
+    private static volatile String problem = "";
+    private static volatile Runnable onLoaded;
+    private static final java.util.regex.Pattern LOADED = java.util.regex.Pattern.compile("\\(\\d+ ms\\) loaded");
+    private static final java.util.regex.Pattern TROUBLE = java.util.regex.Pattern.compile(
+            "(?i)unable to connect|connection (refused|reset|timed out)|timed out|country|not available in your region|access point|failed to connect|authentication|bad credentials|dns|network is unreachable");
 
     private Librespot() {
     }
 
     public static String status() {
         return status;
+    }
+
+    public static String problem() {
+        return problem;
+    }
+
+    public static void onLoaded(Runnable callback) {
+        onLoaded = callback;
     }
 
     public static synchronized PcmStreamSource source() {
@@ -129,8 +142,9 @@ public final class Librespot {
             }
             ProcessBuilder builder = new ProcessBuilder(command);
             builder.environment().put("LIBRESPOT_ACCESS_TOKEN", SpotifyAuth.accessToken());
-            builder.redirectError(ProcessBuilder.Redirect.appendTo(Sonora.dir().resolve("librespot.log").toFile()));
             process = builder.start();
+            problem = "";
+            watchLog(process);
             source = new PcmStreamSource(process.getInputStream());
             status = "running";
             failures = 0;
@@ -149,6 +163,35 @@ public final class Librespot {
             status = e.getMessage();
             Sonora.LOGGER.error("Failed to start librespot", e);
         }
+    }
+
+    private static void watchLog(Process started) {
+        Path log = Sonora.dir().resolve("librespot.log");
+        Thread reader = new Thread(() -> {
+            try (java.io.BufferedReader in = new java.io.BufferedReader(new java.io.InputStreamReader(started.getErrorStream(), java.nio.charset.StandardCharsets.UTF_8));
+                 java.io.Writer out = Files.newBufferedWriter(log, java.nio.charset.StandardCharsets.UTF_8, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND)) {
+                String line;
+                while ((line = in.readLine()) != null) {
+                    out.write(line);
+                    out.write('\n');
+                    out.flush();
+                    if (LOADED.matcher(line).find()) {
+                        problem = "";
+                        Runnable callback = onLoaded;
+                        if (callback != null) {
+                            callback.run();
+                        }
+                    } else if (line.contains("WARN") || line.contains("ERROR")) {
+                        if (TROUBLE.matcher(line).find()) {
+                            problem = line.length() > 200 ? line.substring(0, 200) : line;
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }, "Sonora librespot log");
+        reader.setDaemon(true);
+        reader.start();
     }
 
     private static void stopProcess() {
