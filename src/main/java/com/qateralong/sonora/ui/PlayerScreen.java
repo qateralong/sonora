@@ -1039,7 +1039,7 @@ public class PlayerScreen extends SonoraScreen {
             Sonora.controller().engine().setBarCount(config.visualizerBars);
         });
         y = this.section(g, mx, y, "sonora.section.audio");
-        y = this.choice(g, mx, y, rowW, mouseX, mouseY, "sonora.settings.device", config.outputDevice.isEmpty() ? Sonora.text("sonora.device.default") : config.outputDevice, direction -> {
+        y = this.choice(g, mx, y, rowW, mouseX, mouseY, "sonora.settings.device", config.outputDevice.isEmpty() ? Sonora.text("sonora.device.default") : com.qateralong.sonora.audio.AudioEngine.displayName(config.outputDevice), direction -> {
             List<String> options = new ArrayList<>();
             options.add("");
             options.addAll(this.outputDevices());

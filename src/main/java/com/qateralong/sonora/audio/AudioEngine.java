@@ -1,19 +1,30 @@
 package com.qateralong.sonora.audio;
 
 import com.qateralong.sonora.Sonora;
-import javax.sound.sampled.AudioFormat;
+import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
+import java.nio.ShortBuffer;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import javax.sound.sampled.AudioSystem;
-import javax.sound.sampled.DataLine;
-import javax.sound.sampled.Mixer;
-import javax.sound.sampled.SourceDataLine;
+import org.lwjgl.openal.AL;
+import org.lwjgl.openal.AL10;
+import org.lwjgl.openal.ALC;
+import org.lwjgl.openal.ALC10;
+import org.lwjgl.openal.ALC11;
+import org.lwjgl.openal.ALCCapabilities;
+import org.lwjgl.openal.EXTDisconnect;
+import org.lwjgl.openal.EXTThreadLocalContext;
+import org.lwjgl.openal.ALUtil;
+import org.lwjgl.system.MemoryUtil;
 
 public final class AudioEngine {
     public static final int RATE = 44100;
     private static final int FRAMES = 1024;
     private static final float KNEE = 0.85F;
+    private static final int BUFFERS = 6;
+    private static final String PREFIX = "OpenAL Soft on ";
 
     private final Equalizer equalizer = new Equalizer(RATE);
     private final Spectrum spectrum = new Spectrum(RATE);
@@ -25,7 +36,14 @@ public final class AudioEngine {
     private volatile int barCount = 64;
     private float currentGain = -1.0F;
     private Thread thread;
-    private SourceDataLine line;
+    private long alDevice;
+    private long alContext;
+    private int alSource;
+    private final ArrayDeque<Integer> freeBuffers = new ArrayDeque<>();
+    private int[] alBuffers;
+    private ShortBuffer pcm;
+    private long lastCheck;
+    private boolean canDetectDisconnect;
     private volatile String error;
     private volatile String device = "";
     private volatile float fade = 1.0F;
@@ -63,17 +81,23 @@ public final class AudioEngine {
 
     public static List<String> devices() {
         List<String> names = new ArrayList<>();
-        AudioFormat format = new AudioFormat(RATE, 16, 2, true, false);
-        DataLine.Info info = new DataLine.Info(SourceDataLine.class, format);
-        for (Mixer.Info mixerInfo : AudioSystem.getMixerInfo()) {
-            try {
-                if (AudioSystem.getMixer(mixerInfo).isLineSupported(info) && !names.contains(mixerInfo.getName())) {
-                    names.add(mixerInfo.getName());
+        try {
+            List<String> all = ALUtil.getStringList(0L, ALC11.ALC_ALL_DEVICES_SPECIFIER);
+            if (all != null) {
+                for (String name : all) {
+                    if (!names.contains(name)) {
+                        names.add(name);
+                    }
                 }
-            } catch (Exception ignored) {
             }
+        } catch (Exception e) {
+            Sonora.LOGGER.warn("Failed to list output devices", e);
         }
         return names;
+    }
+
+    public static String displayName(String name) {
+        return name.startsWith(PREFIX) ? name.substring(PREFIX.length()) : name;
     }
 
     public void setDevice(String name) {
@@ -147,27 +171,119 @@ public final class AudioEngine {
         this.thread.start();
     }
 
-    private void openLine() throws Exception {
-        AudioFormat format = new AudioFormat(RATE, 16, 2, true, false);
-        SourceDataLine opened = null;
+    private void openLine() {
+        long device = 0L;
         if (!this.device.isEmpty()) {
-            for (Mixer.Info mixerInfo : AudioSystem.getMixerInfo()) {
-                if (mixerInfo.getName().equals(this.device)) {
-                    try {
-                        opened = (SourceDataLine) AudioSystem.getMixer(mixerInfo).getLine(new DataLine.Info(SourceDataLine.class, format));
-                    } catch (Exception e) {
-                        Sonora.LOGGER.warn("Output device '{}' unavailable, using default", this.device);
-                    }
-                    break;
-                }
+            device = ALC10.alcOpenDevice(this.device);
+            if (device == 0L) {
+                Sonora.LOGGER.warn("Output device '{}' unavailable, using default", this.device);
             }
         }
-        if (opened == null) {
-            opened = AudioSystem.getSourceDataLine(format);
+        if (device == 0L) {
+            device = ALC10.alcOpenDevice((ByteBuffer) null);
         }
-        opened.open(format, RATE / 4 * 4);
-        opened.start();
-        this.line = opened;
+        if (device == 0L) {
+            throw new IllegalStateException("no audio output device");
+        }
+        ALCCapabilities caps = ALC.createCapabilities(device);
+        if (!caps.ALC_EXT_thread_local_context) {
+            ALC10.alcCloseDevice(device);
+            throw new IllegalStateException("OpenAL without ALC_EXT_thread_local_context");
+        }
+        long context = ALC10.alcCreateContext(device, (IntBuffer) null);
+        if (context == 0L) {
+            ALC10.alcCloseDevice(device);
+            throw new IllegalStateException("failed to create audio context");
+        }
+        EXTThreadLocalContext.alcSetThreadContext(context);
+        AL.createCapabilities(caps);
+        this.alDevice = device;
+        this.alContext = context;
+        this.canDetectDisconnect = caps.ALC_EXT_disconnect;
+        this.alSource = AL10.alGenSources();
+        AL10.alSourcei(this.alSource, AL10.AL_SOURCE_RELATIVE, AL10.AL_TRUE);
+        AL10.alSource3f(this.alSource, AL10.AL_POSITION, 0.0F, 0.0F, 0.0F);
+        AL10.alSourcef(this.alSource, AL10.AL_ROLLOFF_FACTOR, 0.0F);
+        this.alBuffers = new int[BUFFERS];
+        AL10.alGenBuffers(this.alBuffers);
+        this.freeBuffers.clear();
+        for (int buffer : this.alBuffers) {
+            this.freeBuffers.add(buffer);
+        }
+        if (this.pcm == null) {
+            this.pcm = MemoryUtil.memAllocShort(FRAMES * 2);
+        }
+        Sonora.LOGGER.info("Audio output: {}", ALC10.alcGetString(device, ALC11.ALC_ALL_DEVICES_SPECIFIER));
+    }
+
+    private boolean opened() {
+        return this.alContext != 0L;
+    }
+
+    private void closeLine() {
+        if (this.alContext == 0L) {
+            return;
+        }
+        try {
+            AL10.alSourceStop(this.alSource);
+            AL10.alSourcei(this.alSource, AL10.AL_BUFFER, 0);
+            AL10.alDeleteSources(this.alSource);
+            AL10.alDeleteBuffers(this.alBuffers);
+        } catch (Exception ignored) {
+        }
+        EXTThreadLocalContext.alcSetThreadContext(0L);
+        AL.setCurrentThread(null);
+        ALC10.alcDestroyContext(this.alContext);
+        ALC10.alcCloseDevice(this.alDevice);
+        this.alContext = 0L;
+        this.alDevice = 0L;
+        this.freeBuffers.clear();
+    }
+
+    private void reclaim() {
+        int processed = AL10.alGetSourcei(this.alSource, AL10.AL_BUFFERS_PROCESSED);
+        for (int i = 0; i < processed; i++) {
+            this.freeBuffers.add(AL10.alSourceUnqueueBuffers(this.alSource));
+        }
+    }
+
+    private void flushAl() {
+        AL10.alSourceStop(this.alSource);
+        reclaim();
+    }
+
+    private boolean disconnected() {
+        long now = System.nanoTime();
+        if (now - this.lastCheck < 500_000_000L) {
+            return false;
+        }
+        this.lastCheck = now;
+        return this.canDetectDisconnect && ALC10.alcGetInteger(this.alDevice, EXTDisconnect.ALC_CONNECTED) == 0;
+    }
+
+    private void writeAl(byte[] bytes, int length) throws InterruptedException {
+        while (true) {
+            reclaim();
+            if (!this.freeBuffers.isEmpty()) {
+                break;
+            }
+            if (this.reopen || this.flushLine) {
+                return;
+            }
+            Thread.sleep(2);
+        }
+        this.pcm.clear();
+        for (int i = 0; i + 1 < length; i += 2) {
+            this.pcm.put((short) ((bytes[i + 1] << 8) | (bytes[i] & 0xFF)));
+        }
+        this.pcm.flip();
+        int buffer = this.freeBuffers.poll();
+        AL10.alBufferData(buffer, AL10.AL_FORMAT_STEREO16, this.pcm, RATE);
+        AL10.alSourceQueueBuffers(this.alSource, buffer);
+        if (AL10.alGetSourcei(this.alSource, AL10.AL_SOURCE_STATE) != AL10.AL_PLAYING
+                && (this.freeBuffers.size() <= BUFFERS - 2)) {
+            AL10.alSourcePlay(this.alSource);
+        }
     }
 
     private void loop() {
@@ -176,21 +292,18 @@ public final class AudioEngine {
         long lastAnalysis = 0L;
         while (true) {
             try {
-                if (this.reopen && this.line != null) {
-                    this.line.stop();
-                    this.line.flush();
-                    this.line.close();
-                    this.line = null;
+                if ((this.reopen || opened() && disconnected()) && opened()) {
+                    closeLine();
                     this.equalizer.reset();
                 }
                 this.reopen = false;
-                if (this.line == null) {
+                if (!opened()) {
                     this.openLine();
                     this.error = null;
                 }
                 if (this.flushLine) {
                     this.flushLine = false;
-                    this.line.flush();
+                    flushAl();
                 }
                 AudioSource current = this.source;
                 long now = System.nanoTime();
@@ -249,15 +362,16 @@ public final class AudioEngine {
                     this.spectrum.analyze(this.barCount);
                     lastAnalysis = now;
                 }
-                this.line.write(bytes, 0, frames * 4);
+                writeAl(bytes, frames * 4);
             } catch (InterruptedException e) {
                 return;
             } catch (Exception e) {
                 this.error = e.getMessage();
                 Sonora.LOGGER.error("Audio output failed", e);
-                if (this.line != null) {
-                    this.line.close();
-                    this.line = null;
+                try {
+                    closeLine();
+                } catch (Exception ignored) {
+                    this.alContext = 0L;
                 }
                 try {
                     Thread.sleep(1000);

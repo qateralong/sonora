@@ -91,6 +91,7 @@ public class Sonora implements ClientModInitializer {
 
     private static void tick(Minecraft minecraft) {
         CONTROLLER.tick();
+        AutoTest.tick(minecraft);
         CONTROLLER.spotify().setFastPolling(minecraft.screen instanceof PlayerScreen);
         while (OPEN.consumeClick()) {
             if (minecraft.screen == null) {

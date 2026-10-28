@@ -28,6 +28,11 @@ dependencies {
 
 loom {
     runs.configureEach { ideConfigGenerated(false) }
+    runs.named("client") {
+        if (project.hasProperty("autotest")) {
+            vmArg("-Dsonora.autotest=${project.property("autotest")}")
+        }
+    }
 }
 
 java {
