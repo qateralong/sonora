@@ -156,5 +156,19 @@
   "sonora.loading": "Loading…",
   "sonora.vpn.hint": "Spotify looks unavailable from your country or network. Turn on a VPN and try again.",
   "sonora.vpn.retry": "Retry",
-  "sonora.vpn.toast": "Spotify is unreachable — try turning on a VPN"
+  "sonora.vpn.toast": "Spotify is unreachable — try turning on a VPN",
+  "sonora.toast.now_playing": "Now playing",
+  "sonora.search.recent": "Recent searches",
+  "sonora.search.clear": "Clear",
+  "sonora.tip.history": "LMB search · RMB remove",
+  "sonora.tip.eq_band": "Drag up/down · RMB reset to 0",
+  "sonora.settings.toasts": "New track notification",
+  "sonora.settings.menu_buttons": "Music button in menus",
+  "sonora.settings.mini_menus": "Mini player in title and pause menus",
+  "sonora.settings.pause_leave": "Pause when leaving a world",
+  "sonora.settings.pause_unfocus": "Pause when the game is minimized",
+  "sonora.section.search": "Search",
+  "sonora.settings.search_history": "Keep search history",
+  "sonora.settings.clear_history": "Clear history",
+  "sonora.settings.history_count": "%s searches"
 }

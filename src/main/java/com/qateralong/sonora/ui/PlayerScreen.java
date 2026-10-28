@@ -137,6 +137,64 @@ public class PlayerScreen extends SonoraScreen {
         this.rebuildWidgets();
     }
 
+    private void search(String query) {
+        this.lastSearch = query;
+        if (this.searchBox != null && !this.searchBox.getValue().equals(query)) {
+            this.searchBox.setValue(query);
+        }
+        if (query.isEmpty() || !SpotifyAuth.loggedIn()) {
+            return;
+        }
+        SonoraConfig config = SonoraConfig.get();
+        if (config.saveSearchHistory && !config.incognito) {
+            config.searchHistory.removeIf(entry -> entry.equalsIgnoreCase(query));
+            config.searchHistory.add(0, query);
+            while (config.searchHistory.size() > 12) {
+                config.searchHistory.remove(config.searchHistory.size() - 1);
+            }
+            SonoraConfig.save();
+        }
+        this.history.clear();
+        this.container = null;
+        this.listTitle = query;
+        this.load(Sonora.controller().spotify().search(query));
+    }
+
+    private void renderSearchHistory(GuiGraphics g, int mx, int y, int mw, int mouseX, int mouseY) {
+        SonoraConfig config = SonoraConfig.get();
+        Draw.scaledText(g, this.font, Sonora.text("sonora.search.recent"), mx, y, 1.25F, 0xFFFFFFFF, true);
+        String clear = Sonora.text("sonora.search.clear");
+        int clearW = this.font.width(clear) + 16;
+        boolean clearHover = Draw.inside(mouseX, mouseY, mx + mw - clearW, y - 3, clearW, 18);
+        Draw.rounded(g, mx + mw - clearW, y - 3, clearW, 18, 9, clearHover ? 0x40FFFFFF : 0x1EFFFFFF);
+        g.drawString(this.font, clear, mx + mw - clearW + 8, y + 2, 0xFFFFFFFF, false);
+        this.hit(mx + mw - clearW, y - 3, clearW, 18, () -> {
+            config.searchHistory.clear();
+            SonoraConfig.save();
+        });
+        int px = mx;
+        int py = y + 22;
+        for (String query : List.copyOf(config.searchHistory)) {
+            int w = Math.min(mw, this.font.width(query) + 34);
+            if (px + w > mx + mw) {
+                px = mx;
+                py += 26;
+            }
+            boolean over = Draw.inside(mouseX, mouseY, px, py, w, 20);
+            Draw.rounded(g, px, py, w, 20, 10, over ? 0x40FFFFFF : 0x1EFFFFFF);
+            Draw.icon(g, Draw.Icon.SEARCH, px + 7, py + 5, 10, 0xFF9A9AA0);
+            g.drawString(this.font, Draw.ellipsize(this.font, query, w - 30), px + 22, py + 6, 0xFFFFFFFF, false);
+            this.hit(px, py, w, 20, () -> this.search(query), () -> {
+                config.searchHistory.remove(query);
+                SonoraConfig.save();
+            });
+            if (over) {
+                this.tip("sonora.tip.history", px + w / 2, py);
+            }
+            px += w + 6;
+        }
+    }
+
     private void toggleLyricsTab() {
         this.switchTab(this.tab == Tab.LYRICS ? (this.beforeLyrics == Tab.LYRICS ? Tab.NOW : this.beforeLyrics) : Tab.LYRICS);
     }
@@ -704,6 +762,9 @@ public class PlayerScreen extends SonoraScreen {
                 Draw.icon(g, Draw.Icon.CLOSE, mx + boxW - 19, my + 9, 10, hover ? 0xFFFFFFFF : 0xFF9A9AA0);
                 this.hit(mx + boxW - 24, my + 4, 20, 20, () -> {
                     this.searchBox.setValue("");
+                    this.lastSearch = "";
+                    this.items = List.of();
+                    this.listTitle = "";
                     this.setFocused(this.searchBox);
                     this.searchBox.setFocused(true);
                 });
@@ -780,6 +841,10 @@ public class PlayerScreen extends SonoraScreen {
                 Draw.rounded(g, mx + 60, ry + 6, Math.min(220, mw / 3) - (i % 3) * 30, 7, 3, Colors.argb(alpha, 0xFFFFFF));
                 Draw.rounded(g, mx + 60, ry + 17, Math.min(140, mw / 5) - (i % 2) * 24, 5, 2, Colors.argb(alpha * 2 / 3, 0xFFFFFF));
             }
+            return;
+        }
+        if (this.items.isEmpty() && this.tab == Tab.SEARCH && this.lastSearch.isEmpty() && !SonoraConfig.get().searchHistory.isEmpty()) {
+            this.renderSearchHistory(g, mx, this.listY + 4, mw, mouseX, mouseY);
             return;
         }
         if (this.items.isEmpty()) {
@@ -940,16 +1005,25 @@ public class PlayerScreen extends SonoraScreen {
             });
             px += w + 6;
         }
-        int top = py + 36;
-        int height = Math.max(60, mh - (top - my) - 28);
+        int panelX = mx;
+        int panelW = Math.min(mw, 760);
+        int top = py + 48;
+        int height = Mth.clamp(mh - (top - my) - 34, 60, 280);
         int bands = Equalizer.FREQUENCIES.length + 1;
-        int slot = Math.min(52, mw / bands);
-        int startX = mx + (mw - slot * bands) / 2;
-        Draw.rounded(g, startX - 8, top - 18, slot * bands + 16, height + 42, 10, 0x14FFFFFF);
+        int scaleW = 30;
+        int slot = (panelW - scaleW - 16) / bands;
+        int startX = panelX + scaleW + 8;
+        Draw.rounded(g, panelX, top - 22, panelW, height + 48, 10, 0x14FFFFFF);
         float[] bars = Visualizer.resample(Sonora.controller().engine().spectrum().bars(), 60);
         Visualizer.draw(g, bars, startX, top, slot * bands, height, accent, "bars", 0x22);
         int zero = top + height / 2;
-        g.fill(startX, zero, startX + slot * bands, zero + 1, 0x18FFFFFF);
+        for (int db = -12; db <= 12; db += 6) {
+            int ly = top + Math.round((12.0F - db) / 24.0F * height);
+            g.fill(startX, ly, startX + slot * bands, ly + 1, db == 0 ? 0x22FFFFFF : 0x0CFFFFFF);
+            String mark = (db > 0 ? "+" : "") + db;
+            Draw.scaledText(g, this.font, mark, panelX + scaleW - this.font.width(mark) * 0.75F, ly - 3, 0.75F, 0xFF6A6A70, false);
+        }
+        g.fill(startX + slot, top - 4, startX + slot + 1, top + height + 4, 0x14FFFFFF);
         for (int band = -1; band < Equalizer.FREQUENCIES.length; band++) {
             int cx = startX + (band + 1) * slot + slot / 2;
             float value = band < 0 ? config.eqPreamp : config.eqGains[band];
@@ -959,18 +1033,31 @@ public class PlayerScreen extends SonoraScreen {
             int hi = Math.max(zero, knobY);
             g.fill(cx - 2, lo, cx + 2, hi, Colors.argb(config.eqEnabled ? 0xFF : 0x80, band < 0 ? 0xFFFFFF : accent));
             boolean over = Draw.inside(mouseX, mouseY, cx - slot / 2, top - 6, slot, height + 12);
-            boolean active = over || this.drag == band || (band < 0 && this.drag == DRAG_PREAMP);
+            boolean active = over || band >= 0 && this.drag == band || band < 0 && this.drag == DRAG_PREAMP;
             Draw.rounded(g, cx - 6, knobY - 6, 12, 12, 6, active ? 0xFFFFFFFF : 0xFFD8D8D8);
             String label = band < 0 ? Sonora.text("sonora.eq.preamp") : Equalizer.LABELS[band];
-            g.drawCenteredString(this.font, label, cx, top + height + 9, active ? 0xFFFFFFFF : 0xFFA0A0A6);
-            String db = String.format("%+.0f", value);
-            Draw.scaledText(g, this.font, db, cx - this.font.width(db) * 0.375F, top - 13, 0.75F, active ? 0xFFFFFFFF : 0xFF8A8A90, false);
+            g.drawCenteredString(this.font, label, cx, top + height + 10, active ? 0xFFFFFFFF : 0xFFA0A0A6);
+            String db = String.format("%+.1f", value).replace(".0", "");
+            Draw.scaledText(g, this.font, db, cx - this.font.width(db) * 0.375F, top - 15, 0.75F, active ? 0xFFFFFFFF : 0xFF8A8A90, false);
+            if (over && this.drag == -1) {
+                this.tip("sonora.tip.eq_band", cx, top - 18);
+            }
         }
         this.hit(startX, top - 6, slot * bands, height + 12, () -> {
             int band = (int) ((this.lastMouseX - startX) / slot) - 1;
             this.drag = band < 0 ? DRAG_PREAMP : band;
             this.dragInfo = new int[]{top, height};
             this.updateEqDrag(this.lastMouseY);
+        }, () -> {
+            int band = (int) ((this.lastMouseX - startX) / slot) - 1;
+            if (band < 0) {
+                config.eqPreamp = 0.0F;
+            } else if (band < config.eqGains.length) {
+                config.eqGains[band] = 0.0F;
+                config.eqPreset = "custom";
+            }
+            Sonora.controller().applyEqualizer();
+            SonoraConfig.save();
         });
     }
 
@@ -1015,10 +1102,13 @@ public class PlayerScreen extends SonoraScreen {
             }
         });
         y = this.toggle(g, mx, y, rowW, mouseX, mouseY, "sonora.settings.accent", config.accentFromArtwork, () -> config.accentFromArtwork = !config.accentFromArtwork);
+        y = this.toggle(g, mx, y, rowW, mouseX, mouseY, "sonora.settings.toasts", config.trackToasts, () -> config.trackToasts = !config.trackToasts);
+        y = this.toggle(g, mx, y, rowW, mouseX, mouseY, "sonora.settings.menu_buttons", config.menuButtons, () -> config.menuButtons = !config.menuButtons);
         y = this.section(g, mx, y, "sonora.section.lyrics");
         y = this.toggle(g, mx, y, rowW, mouseX, mouseY, "sonora.settings.show_lyrics", config.showLyrics, () -> config.showLyrics = !config.showLyrics);
         y = this.section(g, mx, y, "sonora.section.mini");
         y = this.toggle(g, mx, y, rowW, mouseX, mouseY, "sonora.settings.mini", config.miniPlayer, () -> config.miniPlayer = !config.miniPlayer);
+        y = this.toggle(g, mx, y, rowW, mouseX, mouseY, "sonora.settings.mini_menus", config.miniInMenus, () -> config.miniInMenus = !config.miniInMenus);
         y = this.choice(g, mx, y, rowW, mouseX, mouseY, "sonora.settings.corner", Sonora.text("sonora.corner." + config.miniCorner),
                 direction -> config.miniCorner = cycle(new String[]{"top_right", "top_left", "bottom_right", "bottom_left"}, config.miniCorner, direction));
         y = this.choice(g, mx, y, rowW, mouseX, mouseY, "sonora.settings.scale", Math.round(config.miniScale * 100) + "%",
@@ -1061,6 +1151,19 @@ public class PlayerScreen extends SonoraScreen {
             Sonora.controller().setSleepTimer(values[Math.floorMod(at + direction, values.length)]);
         });
         y = this.toggle(g, mx, y, rowW, mouseX, mouseY, "sonora.settings.incognito", config.incognito, () -> config.incognito = !config.incognito);
+        y = this.toggle(g, mx, y, rowW, mouseX, mouseY, "sonora.settings.pause_leave", config.pauseOnLeave, () -> config.pauseOnLeave = !config.pauseOnLeave);
+        y = this.toggle(g, mx, y, rowW, mouseX, mouseY, "sonora.settings.pause_unfocus", config.pauseOnUnfocus, () -> config.pauseOnUnfocus = !config.pauseOnUnfocus);
+        y = this.section(g, mx, y, "sonora.section.search");
+        y = this.toggle(g, mx, y, rowW, mouseX, mouseY, "sonora.settings.search_history", config.saveSearchHistory, () -> {
+            config.saveSearchHistory = !config.saveSearchHistory;
+            if (!config.saveSearchHistory) {
+                config.searchHistory.clear();
+            }
+        });
+        y = this.link(g, mx, y, rowW, mouseX, mouseY, "sonora.settings.clear_history", Sonora.text("sonora.settings.history_count", config.searchHistory.size()), () -> {
+            config.searchHistory.clear();
+            SonoraConfig.save();
+        });
         y = this.section(g, mx, y, "sonora.section.spotify");
         y = this.choice(g, mx, y, rowW, mouseX, mouseY, "sonora.settings.bitrate", config.bitrate + " kbps", direction -> {
             int[] values = {96, 160, 320};
@@ -1408,14 +1511,7 @@ public class PlayerScreen extends SonoraScreen {
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         boolean typing = this.searchBox != null && this.searchBox.isFocused();
         if (typing && (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER)) {
-            String query = this.searchBox.getValue().trim();
-            this.lastSearch = query;
-            if (!query.isEmpty() && SpotifyAuth.loggedIn()) {
-                this.history.clear();
-                this.container = null;
-                this.listTitle = query;
-                this.load(Sonora.controller().spotify().search(query));
-            }
+            this.search(this.searchBox.getValue().trim());
             return true;
         }
         if (!typing) {

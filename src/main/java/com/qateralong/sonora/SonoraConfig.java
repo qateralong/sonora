@@ -38,6 +38,13 @@ public class SonoraConfig {
     public String lastSource = "spotify";
     public String outputDevice = "";
     public boolean incognito = false;
+    public boolean miniInMenus = true;
+    public boolean trackToasts = true;
+    public boolean menuButtons = true;
+    public boolean pauseOnLeave = false;
+    public boolean pauseOnUnfocus = false;
+    public boolean saveSearchHistory = true;
+    public List<String> searchHistory = new ArrayList<>();
 
     public static SonoraConfig get() {
         return instance;
@@ -54,6 +61,9 @@ public class SonoraConfig {
                     SonoraConfig loaded = GSON.fromJson(reader, SonoraConfig.class);
                     if (loaded != null) {
                         instance = loaded;
+                        if (instance.searchHistory == null) {
+                            instance.searchHistory = new ArrayList<>();
+                        }
                     }
                 }
             }

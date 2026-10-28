@@ -9,6 +9,7 @@ import com.qateralong.sonora.spotify.SpotifyAuth;
 import com.qateralong.sonora.ui.MiniPlayer;
 import com.qateralong.sonora.ui.PlayerScreen;
 import com.qateralong.sonora.ui.ScreenButtons;
+import com.qateralong.sonora.ui.TrackToast;
 import java.nio.file.Path;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
@@ -70,6 +71,11 @@ public class Sonora implements ClientModInitializer {
                 Librespot.ensureRunning();
             }
         });
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> client.execute(() -> {
+            if (SonoraConfig.get().pauseOnLeave) {
+                CONTROLLER.setPlaying(false);
+            }
+        }));
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
             Librespot.stop();
             SonoraConfig.save();
@@ -89,8 +95,30 @@ public class Sonora implements ClientModInitializer {
         });
     }
 
+    private static String toastedId = "";
+    private static boolean pausedByFocus;
+
     private static void tick(Minecraft minecraft) {
         CONTROLLER.tick();
+        SonoraConfig config = SonoraConfig.get();
+        MusicController.NowPlaying now = CONTROLLER.nowPlaying();
+        String id = now.track() == null ? "" : now.track().id() + now.track().title();
+        if (!id.equals(toastedId)) {
+            if (!id.isEmpty() && now.playing() && config.trackToasts && !MiniPlayer.visible() && !(minecraft.screen instanceof PlayerScreen)) {
+                TrackToast.show(now.track());
+            }
+            toastedId = id;
+        }
+        if (config.pauseOnUnfocus) {
+            boolean active = minecraft.isWindowActive();
+            if (!active && !pausedByFocus && CONTROLLER.isPlaying()) {
+                pausedByFocus = true;
+                CONTROLLER.setPlaying(false);
+            } else if (active && pausedByFocus) {
+                pausedByFocus = false;
+                CONTROLLER.setPlaying(true);
+            }
+        }
         AutoTest.tick(minecraft);
         CONTROLLER.spotify().setFastPolling(minecraft.screen instanceof PlayerScreen);
         while (OPEN.consumeClick()) {

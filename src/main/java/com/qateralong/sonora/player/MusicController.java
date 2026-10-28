@@ -138,6 +138,17 @@ public final class MusicController {
         this.spotify.setPlaying(play);
     }
 
+    public boolean isPlaying() {
+        NowPlaying now = this.nowPlaying();
+        return now.playing() && (this.mode == Mode.LOCAL || this.spotify.inGame());
+    }
+
+    public void setPlaying(boolean play) {
+        if (this.isPlaying() != play) {
+            this.togglePlay();
+        }
+    }
+
     public boolean loading() {
         return this.loading;
     }

@@ -156,5 +156,19 @@
   "sonora.loading": "Загрузка…",
   "sonora.vpn.hint": "Похоже, Spotify недоступен в вашей стране или сети. Включите VPN и повторите.",
   "sonora.vpn.retry": "Повторить",
-  "sonora.vpn.toast": "Spotify недоступен — попробуйте включить VPN"
+  "sonora.vpn.toast": "Spotify недоступен — попробуйте включить VPN",
+  "sonora.toast.now_playing": "Сейчас играет",
+  "sonora.search.recent": "Недавние запросы",
+  "sonora.search.clear": "Очистить",
+  "sonora.tip.history": "ЛКМ — найти · ПКМ — удалить",
+  "sonora.tip.eq_band": "Тяните вверх/вниз · ПКМ — сброс в 0",
+  "sonora.settings.toasts": "Уведомление о новом треке",
+  "sonora.settings.menu_buttons": "Кнопка «Музыка» в меню",
+  "sonora.settings.mini_menus": "Мини-плеер в главном меню и паузе",
+  "sonora.settings.pause_leave": "Пауза при выходе из мира",
+  "sonora.settings.pause_unfocus": "Пауза, когда игра свёрнута",
+  "sonora.section.search": "Поиск",
+  "sonora.settings.search_history": "Сохранять историю поиска",
+  "sonora.settings.clear_history": "Очистить историю",
+  "sonora.settings.history_count": "%s запросов"
 }

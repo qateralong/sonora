@@ -9,6 +9,8 @@ import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.PauseScreen;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.world.effect.MobEffectInstance;
 
 public final class MiniPlayer {
@@ -57,13 +59,43 @@ public final class MiniPlayer {
         return value < target ? Math.min(target, value + step) : Math.max(target, value - step);
     }
 
+    public static boolean inMenu(Screen screen) {
+        return screen != null && !(screen instanceof SonoraScreen) && (Minecraft.getInstance().level == null || screen instanceof PauseScreen);
+    }
+
+    public static boolean visible() {
+        Minecraft minecraft = Minecraft.getInstance();
+        SonoraConfig config = SonoraConfig.get();
+        if (!config.miniPlayer || Sonora.controller().nowPlaying().track() == null) {
+            return false;
+        }
+        Screen screen = minecraft.screen;
+        return screen == null ? !minecraft.options.hideGui : inMenu(screen) && config.miniInMenus;
+    }
+
     public static void render(GuiGraphics g, DeltaTracker delta) {
+        if (inMenu(Minecraft.getInstance().screen)) {
+            return;
+        }
+        draw(g, false);
+    }
+
+    public static void renderOnScreen(GuiGraphics g, Screen screen) {
+        if (inMenu(screen) && SonoraConfig.get().miniInMenus) {
+            g.pose().pushPose();
+            g.pose().translate(0.0F, 0.0F, 400.0F);
+            draw(g, true);
+            g.pose().popPose();
+        }
+    }
+
+    private static void draw(GuiGraphics g, boolean menu) {
         Minecraft minecraft = Minecraft.getInstance();
         SonoraConfig config = SonoraConfig.get();
         long now = Util.getMillis();
         float dt = lastFrame == 0L ? 0.0F : Math.min(0.1F, (now - lastFrame) / 1000.0F);
         lastFrame = now;
-        boolean hidden = !config.miniPlayer || minecraft.options.hideGui || minecraft.getDebugOverlay().showDebugScreen() || minecraft.screen instanceof PlayerScreen;
+        boolean hidden = !config.miniPlayer || !menu && (minecraft.options.hideGui || minecraft.getDebugOverlay().showDebugScreen()) || minecraft.screen instanceof PlayerScreen;
         MusicController.NowPlaying state = Sonora.controller().nowPlaying();
         if (state.track() != null) {
             lastNow = state;
@@ -98,7 +130,7 @@ public final class MiniPlayer {
         float slide = (1.0F - Draw.ease(shown)) * (scaledW + margin + 4);
         float x = right ? screenW - scaledW - margin + slide : margin - slide;
         float y = bottom ? screenH - scaledH - margin - 22 : margin;
-        if (!bottom && right && minecraft.player != null) {
+        if (!bottom && right && minecraft.player != null && !menu) {
             boolean beneficial = false;
             boolean harmful = false;
             for (MobEffectInstance effect : minecraft.player.getActiveEffects()) {
