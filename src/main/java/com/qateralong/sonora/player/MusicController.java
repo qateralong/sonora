@@ -133,8 +133,9 @@ public final class MusicController {
             this.spotify.transferHere(true);
             return;
         }
-        this.engine.setPaused(false);
-        this.spotify.setPlaying(!this.spotify.playing());
+        boolean play = !this.spotify.playing();
+        this.engine.setPaused(!play && this.spotify.inGame());
+        this.spotify.setPlaying(play);
     }
 
     public boolean loading() {
@@ -208,6 +209,7 @@ public final class MusicController {
             if (stream != null) {
                 stream.flush();
             }
+            this.engine.flushOutput();
             this.spotify.seek(millis);
         }
     }
@@ -412,6 +414,9 @@ public final class MusicController {
     public void tick() {
         this.tickLoading();
         this.tickSleep();
+        if (this.mode == Mode.SPOTIFY && this.engine.paused() && (this.spotify.playing() || !this.spotify.inGame())) {
+            this.engine.setPaused(false);
+        }
         if (this.mode == Mode.SPOTIFY && SpotifyAuth.loggedIn()) {
             PcmStreamSource stream = Librespot.source();
             if (stream != null && this.engine.source() != stream) {

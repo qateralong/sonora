@@ -30,8 +30,10 @@ public record TrackInfo(String id, String uri, String title, List<String> artist
         }
         List<String> artists = new ArrayList<>();
         if (item.has("artists")) {
-            for (JsonElement artist : item.getAsJsonArray("artists")) {
-                artists.add(string(artist.getAsJsonObject(), "name"));
+            for (JsonElement artist : array(item, "artists")) {
+                if (artist.isJsonObject()) {
+                    artists.add(string(artist.getAsJsonObject(), "name"));
+                }
             }
         } else if (item.has("show") && item.get("show").isJsonObject()) {
             artists.add(string(item.getAsJsonObject("show"), "name"));
@@ -41,11 +43,11 @@ public record TrackInfo(String id, String uri, String title, List<String> artist
         if (item.has("album") && item.get("album").isJsonObject()) {
             JsonObject albumObject = item.getAsJsonObject("album");
             album = string(albumObject, "name");
-            art = bestImage(albumObject.getAsJsonArray("images"), 300);
+            art = bestImage(array(albumObject, "images"), 300);
         } else if (item.has("images")) {
-            art = bestImage(item.getAsJsonArray("images"), 300);
+            art = bestImage(array(item, "images"), 300);
         }
-        long duration = item.has("duration_ms") ? item.get("duration_ms").getAsLong() : 0L;
+        long duration = item.has("duration_ms") && item.get("duration_ms").isJsonPrimitive() ? item.get("duration_ms").getAsLong() : 0L;
         return new TrackInfo(string(item, "id"), string(item, "uri"), string(item, "name"), artists, album, art, duration, null, null);
     }
 
@@ -56,6 +58,9 @@ public record TrackInfo(String id, String uri, String title, List<String> artist
         String best = null;
         int bestScore = Integer.MAX_VALUE;
         for (JsonElement element : images) {
+            if (!element.isJsonObject()) {
+                continue;
+            }
             JsonObject image = element.getAsJsonObject();
             int width = image.has("width") && !image.get("width").isJsonNull() ? image.get("width").getAsInt() : target;
             int score = Math.abs(width - target) + (width < target ? 1000 : 0);
@@ -67,7 +72,19 @@ public record TrackInfo(String id, String uri, String title, List<String> artist
         return best;
     }
 
+    public static boolean bool(JsonObject object, String key) {
+        return object != null && object.has(key) && object.get(key).isJsonPrimitive() && object.get(key).getAsBoolean();
+    }
+
+    public static JsonArray array(JsonObject object, String key) {
+        return object != null && object.has(key) && object.get(key).isJsonArray() ? object.getAsJsonArray(key) : new JsonArray();
+    }
+
+    public static JsonObject object(JsonObject object, String key) {
+        return object != null && object.has(key) && object.get(key).isJsonObject() ? object.getAsJsonObject(key) : null;
+    }
+
     public static String string(JsonObject object, String key) {
-        return object != null && object.has(key) && !object.get(key).isJsonNull() ? object.get(key).getAsString() : "";
+        return object != null && object.has(key) && object.get(key).isJsonPrimitive() ? object.get(key).getAsString() : "";
     }
 }

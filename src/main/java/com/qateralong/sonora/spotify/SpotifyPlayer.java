@@ -14,8 +14,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class SpotifyPlayer {
-    private final ExecutorService executor = Executors.newSingleThreadExecutor(runnable -> {
+    private final ExecutorService commands = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "Sonora Spotify");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private final ExecutorService executor = Executors.newFixedThreadPool(2, runnable -> {
+        Thread thread = new Thread(runnable, "Sonora Spotify browse");
         thread.setDaemon(true);
         return thread;
     });
@@ -86,10 +91,10 @@ public final class SpotifyPlayer {
         TrackInfo next = state.has("item") && state.get("item").isJsonObject() ? TrackInfo.fromSpotify(state.getAsJsonObject("item")) : null;
         boolean changed = next != null && (this.track == null || !next.id().equals(this.track.id()));
         this.track = next;
-        this.playing = state.has("is_playing") && state.get("is_playing").getAsBoolean();
+        this.playing = TrackInfo.bool(state, "is_playing");
         this.progress = state.has("progress_ms") && !state.get("progress_ms").isJsonNull() ? state.get("progress_ms").getAsLong() : 0L;
         this.stamp = System.currentTimeMillis();
-        this.shuffle = state.has("shuffle_state") && state.get("shuffle_state").getAsBoolean();
+        this.shuffle = TrackInfo.bool(state, "shuffle_state");
         this.repeat = TrackInfo.string(state, "repeat_state");
         if (state.has("device") && state.get("device").isJsonObject()) {
             JsonObject device = state.getAsJsonObject("device");
@@ -127,7 +132,7 @@ public final class SpotifyPlayer {
         if (devices == null || !devices.has("devices")) {
             return;
         }
-        for (JsonElement element : devices.getAsJsonArray("devices")) {
+        for (JsonElement element : TrackInfo.array(devices, "devices")) {
             JsonObject device = element.getAsJsonObject();
             if (SonoraConfig.get().deviceName.equals(TrackInfo.string(device, "name"))) {
                 this.ourDeviceId = TrackInfo.string(device, "id");
@@ -200,7 +205,7 @@ public final class SpotifyPlayer {
                 Sonora.LOGGER.warn("Spotify command failed: {}", e.getMessage());
             }
             this.pollSoon();
-        }, this.executor);
+        }, this.commands);
     }
 
     private interface ThrowingRunnable {
@@ -361,22 +366,23 @@ public final class SpotifyPlayer {
                     if (page == null) {
                         break;
                     }
-                    for (JsonElement element : page.getAsJsonArray("items")) {
+                    for (JsonElement element : TrackInfo.array(page, "items")) {
                         if (!element.isJsonObject()) {
                             continue;
                         }
                         JsonObject playlist = element.getAsJsonObject();
-                        String owner = playlist.has("owner") ? TrackInfo.string(playlist.getAsJsonObject("owner"), "display_name") : "";
+                        String owner = TrackInfo.string(TrackInfo.object(playlist, "owner"), "display_name");
                         int total = 0;
                         for (String key : new String[]{"tracks", "items"}) {
-                            if (playlist.has(key) && playlist.get(key).isJsonObject() && playlist.getAsJsonObject(key).has("total")) {
-                                total = playlist.getAsJsonObject(key).get("total").getAsInt();
+                            JsonObject counter = TrackInfo.object(playlist, key);
+                            if (counter != null && counter.has("total") && counter.get("total").isJsonPrimitive()) {
+                                total = counter.get("total").getAsInt();
                             }
                         }
                         items.add(new BrowseItem(BrowseItem.Kind.PLAYLIST, TrackInfo.string(playlist, "id"), TrackInfo.string(playlist, "uri"),
-                                TrackInfo.string(playlist, "name"), owner + " · " + total, TrackInfo.bestImage(playlist.getAsJsonArray("images"), 64), 0L, null, null));
+                                TrackInfo.string(playlist, "name"), owner + " · " + total, TrackInfo.bestImage(TrackInfo.array(playlist, "images"), 64), 0L, null, null));
                     }
-                    next = page.has("next") && !page.get("next").isJsonNull() ? page.get("next").getAsString() : null;
+                    next = TrackInfo.string(page, "next").isEmpty() ? null : TrackInfo.string(page, "next");
                 }
             } catch (Exception e) {
                 this.error = e.getMessage();
@@ -410,7 +416,7 @@ public final class SpotifyPlayer {
                     if (page == null) {
                         break;
                     }
-                    for (JsonElement element : page.getAsJsonArray("items")) {
+                    for (JsonElement element : TrackInfo.array(page, "items")) {
                         if (!element.isJsonObject()) {
                             continue;
                         }
@@ -424,7 +430,7 @@ public final class SpotifyPlayer {
                         String art = track.artUrl() != null ? track.artUrl() : container.artUrl();
                         items.add(new BrowseItem(BrowseItem.Kind.TRACK, track.id(), track.uri(), track.title(), track.artistLine(), art, track.durationMs(), track, null));
                     }
-                    next = page.has("next") && !page.get("next").isJsonNull() ? page.get("next").getAsString() : null;
+                    next = TrackInfo.string(page, "next").isEmpty() ? null : TrackInfo.string(page, "next");
                 }
             } catch (Exception e) {
                 this.error = e.getMessage();
@@ -443,7 +449,7 @@ public final class SpotifyPlayer {
                 }
                 if (result.has("tracks")) {
                     items.add(BrowseItem.header(Sonora.text("sonora.browse.tracks")));
-                    for (JsonElement element : result.getAsJsonObject("tracks").getAsJsonArray("items")) {
+                    for (JsonElement element : TrackInfo.array(TrackInfo.object(result, "tracks"), "items")) {
                         if (element.isJsonObject()) {
                             TrackInfo track = TrackInfo.fromSpotify(element.getAsJsonObject());
                             items.add(new BrowseItem(BrowseItem.Kind.TRACK, track.id(), track.uri(), track.title(), track.artistLine(), track.artUrl(), track.durationMs(), track, null));
@@ -452,24 +458,24 @@ public final class SpotifyPlayer {
                 }
                 if (result.has("albums")) {
                     items.add(BrowseItem.header(Sonora.text("sonora.browse.albums")));
-                    for (JsonElement element : result.getAsJsonObject("albums").getAsJsonArray("items")) {
+                    for (JsonElement element : TrackInfo.array(TrackInfo.object(result, "albums"), "items")) {
                         if (element.isJsonObject()) {
                             JsonObject album = element.getAsJsonObject();
-                            String artists = album.has("artists") ? album.getAsJsonArray("artists").asList().stream()
-                                    .map(a -> TrackInfo.string(a.getAsJsonObject(), "name")).reduce((a, b) -> a + ", " + b).orElse("") : "";
+                            String artists = TrackInfo.array(album, "artists").asList().stream().filter(JsonElement::isJsonObject)
+                                    .map(a -> TrackInfo.string(a.getAsJsonObject(), "name")).reduce((a, b) -> a + ", " + b).orElse("");
                             items.add(new BrowseItem(BrowseItem.Kind.ALBUM, TrackInfo.string(album, "id"), TrackInfo.string(album, "uri"),
-                                    TrackInfo.string(album, "name"), artists, TrackInfo.bestImage(album.getAsJsonArray("images"), 64), 0L, null, null));
+                                    TrackInfo.string(album, "name"), artists, TrackInfo.bestImage(TrackInfo.array(album, "images"), 64), 0L, null, null));
                         }
                     }
                 }
                 if (result.has("playlists")) {
                     items.add(BrowseItem.header(Sonora.text("sonora.browse.playlists")));
-                    for (JsonElement element : result.getAsJsonObject("playlists").getAsJsonArray("items")) {
+                    for (JsonElement element : TrackInfo.array(TrackInfo.object(result, "playlists"), "items")) {
                         if (element.isJsonObject()) {
                             JsonObject playlist = element.getAsJsonObject();
-                            String owner = playlist.has("owner") ? TrackInfo.string(playlist.getAsJsonObject("owner"), "display_name") : "";
+                            String owner = TrackInfo.string(TrackInfo.object(playlist, "owner"), "display_name");
                             items.add(new BrowseItem(BrowseItem.Kind.PLAYLIST, TrackInfo.string(playlist, "id"), TrackInfo.string(playlist, "uri"),
-                                    TrackInfo.string(playlist, "name"), owner, TrackInfo.bestImage(playlist.getAsJsonArray("images"), 64), 0L, null, null));
+                                    TrackInfo.string(playlist, "name"), owner, TrackInfo.bestImage(TrackInfo.array(playlist, "images"), 64), 0L, null, null));
                         }
                     }
                 }
@@ -486,7 +492,7 @@ public final class SpotifyPlayer {
             try {
                 JsonObject result = SpotifyApi.get("/me/player/queue");
                 if (result != null && result.has("queue")) {
-                    for (JsonElement element : result.getAsJsonArray("queue")) {
+                    for (JsonElement element : TrackInfo.array(result, "queue")) {
                         if (element.isJsonObject()) {
                             TrackInfo track = TrackInfo.fromSpotify(element.getAsJsonObject());
                             items.add(new BrowseItem(BrowseItem.Kind.TRACK, track.id(), track.uri(), track.title(), track.artistLine(), track.artUrl(), track.durationMs(), track, null));

@@ -8,7 +8,7 @@ public class PcmStreamSource extends QueuedSource {
     private volatile boolean discarding;
 
     public PcmStreamSource(InputStream input) {
-        super(32);
+        super(8);
         this.input = input;
         Thread thread = new Thread(this::pump, "Sonora stream reader");
         thread.setDaemon(true);
